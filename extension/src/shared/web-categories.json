@@ -1,0 +1,22 @@
+{
+  "_comment": "Blockable website categories. Ids must match WEB_CATEGORIES in backend/app/core/catalog.py (checked by backend/tests/test_web_filter.py). Lists are built into rulesets/<id>.json by scripts/update-web-categories.js from the HaGeZi DNS blocklists (GPL-3.0, see rulesets/LICENSE-DATA.md) plus AgentShield's own additions (web-category-additions.json); 'streaming' has no downloaded list, only the additions.",
+  "source_base": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/",
+  "categories": [
+    { "id": "malware", "default": true, "sources": ["tif.mini-onlydomains.txt", "fake-onlydomains.txt"] },
+    { "id": "adult", "default": true, "sources": ["nsfw-onlydomains.txt"] },
+    { "id": "piracy", "default": true, "sources": ["anti.piracy-onlydomains.txt"] },
+    { "id": "gambling", "default": false, "sources": ["gambling.mini-onlydomains.txt"] },
+    { "id": "social", "default": false, "sources": ["social-onlydomains.txt"] },
+    { "id": "bypass", "default": false, "sources": ["doh-vpn-proxy-bypass-onlydomains.txt"] },
+    { "id": "streaming", "default": false, "sources": [] }
+  ],
+  "never_block": [
+    "google.com", "googleapis.com", "gstatic.com", "googleusercontent.com", "youtube.com", "ytimg.com",
+    "microsoft.com", "microsoftonline.com", "live.com", "office.com", "windows.net", "bing.com",
+    "apple.com", "icloud.com", "amazon.com", "amazonaws.com", "cloudfront.net", "akamaihd.net",
+    "github.com", "githubusercontent.com", "wikipedia.org", "cloudflare.com",
+    "blogspot.com", "wordpress.com",
+    "chatgpt.com", "openai.com", "claude.ai", "anthropic.com", "perplexity.ai", "deepseek.com",
+    "mistral.ai", "poe.com", "meta.ai", "grok.com"
+  ]
+}

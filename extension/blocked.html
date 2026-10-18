@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentShield - Website blocked</title>
+  <style>
+    /* Same look as the in-page security notice (src/content/styles.css): blue brand bar,
+       coloured status band, incident table, "why" box. Ids are filled in by blocked.js. */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent: #c81e1e;
+      --accent-bg: #fdf2f2;
+      --ink: #0f172a;
+      --ink-2: #334155;
+      --muted: #64748b;
+      --line: #e5e9f0;
+    }
+    body.reason-activation { --accent: #b45309; --accent-bg: #fffbeb; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background: #eef2f7;
+      color: var(--ink);
+      font: 15px/1.55 "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .notice {
+      width: 100%;
+      max-width: 600px;
+      background: #ffffff;
+      border: 1px solid #d0d7e2;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px -16px rgba(15, 23, 42, 0.25), 0 2px 6px rgba(15, 23, 42, 0.06);
+    }
+
+    /* Brand bar */
+    .brandbar {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 12px 24px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 45%, #0ea5e9 100%);
+      font-size: 13px;
+    }
+    .brand-logo { width: 24px; height: 24px; flex-shrink: 0; filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.35)); }
+    .brand-name { font-weight: 700; font-size: 14px; }
+    .brand-sub { padding-left: 9px; border-left: 1px solid rgba(255, 255, 255, 0.35); color: rgba(255, 255, 255, 0.85); }
+    .brand-notice { margin-left: auto; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.85); }
+
+    /* Status band */
+    .status {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      padding: 24px;
+      background: var(--accent-bg);
+      border-left: 4px solid var(--accent);
+      border-bottom: 1px solid var(--line);
+    }
+    .status-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .badge {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    h1 { font-size: 24px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+    p.subtitle { margin-top: 4px; font-size: 14.5px; color: var(--ink-2); }
+
+    /* Body */
+    .body { padding: 22px 24px 8px; }
+    .facts {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+    .info-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 14px;
+      padding: 11px 16px;
+      font-size: 14px;
+      border-top: 1px solid #eef1f6;
+    }
+    .info-row:first-child { border-top: none; }
+    .info-row:nth-child(odd) { background: #f8fafc; }
+    .info-label { color: var(--muted); font-weight: 600; }
+    .info-val { color: var(--ink); font-weight: 600; word-break: break-word; }
+    .mono {
+      font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+      font-size: 13px;
+      font-weight: 500;
+      background: #eef2f7;
+      border-radius: 4px;
+      padding: 1px 7px;
+      justify-self: start;
+    }
+    .why {
+      border-left: 3px solid #1d4ed8;
+      background: #f8fafc;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+    }
+    .why-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #1e3a8a;
+      margin-bottom: 4px;
+    }
+    .why p { font-size: 14.5px; color: var(--ink-2); }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 24px;
+      border-top: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .footnote { font-size: 12.5px; color: var(--muted); }
+    .actions { display: flex; gap: 10px; margin-left: auto; }
+    button {
+      padding: 10px 22px;
+      border-radius: 7px;
+      font: 600 14px/1.2 "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.15s ease;
+    }
+    button:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+    .btn-primary { background: #1d4ed8; color: #ffffff; }
+    .btn-primary:hover { background: #1e40af; }
+    .btn-secondary { background: #ffffff; color: var(--ink-2); border-color: #cbd5e1; }
+    .btn-secondary:hover { background: #f1f5f9; }
+
+    @media (max-width: 520px) {
+      .info-row { grid-template-columns: 1fr; gap: 2px; }
+      .brand-notice { display: none; }
+      h1 { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="notice" role="alert" aria-labelledby="title">
+    <div class="brandbar">
+      <img src="icons/icon-48.png" alt="" class="brand-logo" />
+      <span class="brand-name">AgentShield</span>
+      <span class="brand-sub">Data Protection</span>
+      <span class="brand-notice">Security policy notice</span>
+    </div>
+
+    <div class="status">
+      <div class="status-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" /><line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
+        </svg>
+      </div>
+      <div>
+        <span class="badge">Website blocked</span>
+        <h1 id="title">Website blocked by organization policy</h1>
+        <p class="subtitle">Access to this website is restricted by your organization's security policy.</p>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="facts">
+        <div class="info-row" id="row-domain">
+          <span class="info-label">Website</span>
+          <span class="info-val" id="target-domain">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Category</span>
+          <span class="info-val" id="policy-category">Restricted by your organization's website policy</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Policy rule</span>
+          <span class="info-val mono" id="rule-triggered">dlp.blocked_domain</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Set by</span>
+          <span class="info-val" id="org-name">AgentShield</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Time</span>
+          <span class="info-val" id="blocked-at">-</span>
+        </div>
+      </div>
+
+      <div class="why">
+        <div class="why-title">Why is this blocked?</div>
+        <p id="why-blocked">This website is restricted by your organization's security policy.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="footnote">AgentShield stopped this page in your browser.</span>
+      <div class="actions">
+        <button class="btn-secondary" id="btn-dashboard">Open AgentShield Dashboard</button>
+        <button class="btn-primary" id="btn-back">Go back</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="blocked.js"></script>
+</body>
+</html>

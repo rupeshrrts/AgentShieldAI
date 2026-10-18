@@ -1,0 +1,16 @@
+{
+  "name": "agentshield-extension",
+  "version": "1.0.0",
+  "description": "AgentShield Chrome Manifest V3 Extension",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "node tests/run-tests.js && node tests/activation-roundtrip.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.3.3"
+  }
+}

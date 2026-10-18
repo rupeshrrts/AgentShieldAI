@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: agentshield-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentshield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-agentshield_poc}
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentshield} -d ${POSTGRES_DB:-agentshield_poc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - agentshield-internal
+    # Database is isolated to internal network and not exposed directly on host in production
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agentshield-prod-backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-agentshield}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agentshield_poc}}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be configured for production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-720}
+      INITIAL_ORG_NAME: ${INITIAL_ORG_NAME:-Acme Corp}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      ADMIN_CONSOLE_URL: ${ADMIN_CONSOLE_URL:-}
+      STAFF_MFA_KEY: ${STAFF_MFA_KEY:-}
+      STAFF_TOKEN_HOURS: ${STAFF_TOKEN_HOURS:-8}
+      DASHBOARD_URL: ${DASHBOARD_URL:-}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-true}
+      COMPANY_SIGNUP_ENABLED: ${COMPANY_SIGNUP_ENABLED:-false}
+      TRIAL_DAYS: ${TRIAL_DAYS:-30}
+      EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-false}
+      CREDITS_DEVICE_LIMIT: ${CREDITS_DEVICE_LIMIT:-3}
+      FREE_TIER_ENABLED: ${FREE_TIER_ENABLED:-true}
+      REFERRAL_BONUS_CHECKS: ${REFERRAL_BONUS_CHECKS:-100}
+      REFERRAL_MAX: ${REFERRAL_MAX:-10}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      BILLING_SELLER_NAME: ${BILLING_SELLER_NAME:-AgentShield}
+      BILLING_SELLER_DETAILS: ${BILLING_SELLER_DETAILS:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      CHROME_STORE_EXTENSION_ID: ${CHROME_STORE_EXTENSION_ID:-}
+      EDGE_STORE_EXTENSION_ID: ${EDGE_STORE_EXTENSION_ID:-}
+      # Built extension package and installer (see INSTALL.md 1.4), offered for download in the portal
+      EXTENSION_PACKAGE_DIR: /srv/agentshield-dist/package
+      SYSTEM_SETUP_PATH: /srv/agentshield-dist/AgentShield-System-Setup.exe
+    volumes:
+      - ./dist-installer:/srv/agentshield-dist:ro
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - agentshield-internal
+      - agentshield-public
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: agentshield-prod-dashboard
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - agentshield-internal
+      - agentshield-public
+
+networks:
+  agentshield-internal:
+    internal: true
+  agentshield-public:
+    driver: bridge
+
+volumes:
+  prod_postgres_data:

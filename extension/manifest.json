@@ -1,0 +1,85 @@
+{
+  "manifest_version": 3,
+  "name": "AgentShield - AI Browser Security",
+  "version": "1.8.0",
+  "description": "Stops secrets and personal data leaking into AI tools, and blocks dangerous, adult and piracy websites.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "declarativeNetRequest",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "storage": {
+    "managed_schema": "managed_schema.json"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      { "id": "cat_malware", "enabled": false, "path": "rulesets/malware.json" },
+      { "id": "cat_adult", "enabled": false, "path": "rulesets/adult.json" },
+      { "id": "cat_piracy", "enabled": false, "path": "rulesets/piracy.json" },
+      { "id": "cat_gambling", "enabled": false, "path": "rulesets/gambling.json" },
+      { "id": "cat_social", "enabled": false, "path": "rulesets/social.json" },
+      { "id": "cat_bypass", "enabled": false, "path": "rulesets/bypass.json" },
+      { "id": "cat_streaming", "enabled": false, "path": "rulesets/streaming.json" }
+    ]
+  },
+  "background": {
+    "service_worker": "dist/background/service-worker.js"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "AgentShield Protection",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content/domain-blocker.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content/content.js"
+      ],
+      "css": [
+        "src/content/styles.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*",
+        "blocked.html",
+        "blocked.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxsmCDzRk87r7OIc8zXXjZo7JH69gjQEafdL/NHEEdvXO7SyPDMBljgAIH8JkSHftX1v5XDXDQSZ/nstivlfBE9gGOakwUr6VbymQa6+LtRENek8+EKkkJ6fUQhgZf2vIhQPV+sTGLIKbk92zBwZDdC4ri8G1HAk4cNoyeWMm53hXc+nykpmjv0EOBO14zSBu4dXzbGOjOh4isSp65wFqWFwF19+yNuQ+gUBFwJNIiIYz8xvXbEC1TXo5UOM7S8baBESsYnQgO5sQyX8tRqLOS1F0mZWr2+7QBavT5GIfEiB9ARH/65M/SXUTy1/Bnv2otRy/sFCfVm3w+aik5BSr7wIDAQAB"
+}

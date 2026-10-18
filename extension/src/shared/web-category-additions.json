@@ -1,0 +1,50 @@
+{
+  "_comment": "AgentShield's own additions to the website categories (not HaGeZi data). 'domains' are blocked with their subdomains. 'name_patterns' block any site whose address (or a subdomain of it) STARTS with the name, under any ending: pagalworld.com.se, www.pagalworld.pw, filmyzilla13.org. So use only distinctive site names, never ordinary words or names that start other sites' names. 'host_keywords' block any site whose host name CONTAINS the word anywhere (bhojpurimasti.in, new-mp3-songs.xyz), never the path or query, so a Google search for the word still works; they are broad on purpose, so put them only in categories where every match belongs (e.g. 'song' in Movies, music & streaming, never in a default-on category if it could hit ordinary sites). 'exclude_domains' removes sites (with subdomains) from that category's downloaded list, e.g. LinkedIn and Reddit stay open under Social networks; look-alike scam domains in Malware are unaffected. Built into rulesets/<category>.json by: node scripts/update-web-categories.js --additions-only (no download). Checked by tests/run-tests.js.",
+  "piracy": {
+    "domains": [
+      "biharmasti.in", "biharmasti.co.in", "bhojpurimasti.in", "bhojpuriplanet.in"
+    ],
+    "host_keywords": ["torrent"],
+    "name_patterns": [
+      "biharmasti", "bhojpurimasti", "bhojpuriplanet", "pagalworld", "pagalfree", "pagalsongs", "mrjatt", "djpunjab", "djjohal", "djyoungster",
+      "pendujatt", "okjatt", "masstamilan", "starmusiq", "naasongs", "songspk", "wapking", "djmaza", "freshmaza",
+      "mymp3song", "bestwap", "isaimini", "isaidub", "tamilyogi", "tamilrockers", "tamilblasters", "tamilmv",
+      "tamilgun", "madrasrockers", "kuttymovies", "kuttyweb", "jiorockers", "filmyzilla", "filmywap", "afilmywap",
+      "filmy4wap", "filmyhit", "filmymeet", "filmyfly", "khatrimaza", "worldfree4u", "bolly4u", "bollyflix",
+      "movierulz", "ibomma", "skymovieshd", "hdhub4u", "katmoviehd", "mp4moviez", "jalshamoviez",
+      "9xmovies", "7starhd", "123mkv", "vegamovies", "extramovies", "moviesflix", "sdmoviespoint", "ssrmovies",
+      "9kmovies", "desiremovies", "mkvcinemas", "cinevood", "todaypk", "coolmoviez", "downloadhub", "moviesverse"
+    ]
+  },
+  "adult": {
+    "host_keywords": [
+      "porn", "xxx", "xvideo", "xnxx", "xhamster", "hentai", "nsfw", "nudes", "sexy", "milf", "boobs", "camgirl",
+      "chudai", "desisex", "antarvasna", "kamukta"
+    ]
+  },
+  "social": {
+    "exclude_domains": [
+      "linkedin.com", "licdn.com", "linkedin.cn", "linkedin.at", "linkedin.be", "linkedin.nl",
+      "reddit.com", "redd.it", "redditmedia.com", "redditstatic.com"
+    ]
+  },
+  "streaming": {
+    "domains": [
+      "netflix.com", "primevideo.com", "hotstar.com", "jiohotstar.com", "jiocinema.com", "zee5.com", "sonyliv.com",
+      "mxplayer.in", "voot.com", "altbalaji.com", "altt.co.in", "erosnow.com", "sunnxt.com", "aha.video", "hoichoi.tv",
+      "shemaroome.com", "hungama.com", "discoveryplus.com", "discoveryplus.in", "lionsgateplay.com", "eros.now",
+      "hulu.com", "disneyplus.com", "max.com", "hbomax.com", "peacocktv.com", "paramountplus.com", "crunchyroll.com",
+      "mubi.com", "tubitv.com", "pluto.tv", "plex.tv", "twitch.tv", "dailymotion.com",
+      "spotify.com", "gaana.com", "jiosaavn.com", "saavn.com", "wynk.in", "soundcloud.com", "deezer.com", "tidal.com",
+      "pandora.com", "audiomack.com", "boomplay.com", "resso.com", "anghami.com", "napster.com", "iheart.com",
+      "raaga.com", "bandcamp.com"
+    ],
+    "host_keywords": [
+      "mp3", "mp4", "song", "movie", "bhojpuri", "filmy", "ringtone", "lyrics", "webseries", "pagal", "masti"
+    ],
+    "name_patterns": [
+      "mp3juice", "mp3skull", "mp3paw", "mp3quack", "mp3clan", "y2mate", "ytmp3", "savefrom", "tubidy",
+      "pagalworld", "mrjatt", "djpunjab", "biharmasti", "filmyzilla", "movierulz", "vegamovies", "9xmovies"
+    ]
+  }
+}

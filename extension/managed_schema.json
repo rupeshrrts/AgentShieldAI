@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "apiUrl": {
+      "title": "AgentShield server URL",
+      "description": "Base URL of the AgentShield API, for example https://agentshield.yourcompany.com. Grants no access: each user still activates the browser with their account and an activation code, and codes for other servers are refused.",
+      "type": "string"
+    },
+    "dashboardUrl": {
+      "title": "Dashboard URL",
+      "description": "Optional. Opened from the activation screen so users can sign in and generate an activation code.",
+      "type": "string"
+    }
+  }
+}

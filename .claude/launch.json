@@ -1,0 +1,74 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "test-backend-8001",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd backend; $env:DATABASE_URL='sqlite:///./e2e_agentshield.db'; $env:ALLOWED_ORIGINS='http://localhost:5174,http://localhost:5175'; $env:DASHBOARD_URL='http://localhost:5174'; $env:SMTP_HOST=''; .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8001"
+      ],
+      "port": 8001
+    },
+    {
+      "name": "test-backend-8001-mockpay",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd backend; $env:DATABASE_URL='sqlite:///./e2e_agentshield.db'; $env:ALLOWED_ORIGINS='http://localhost:5174,http://localhost:5175'; $env:DASHBOARD_URL='http://localhost:5174'; $env:SMTP_HOST=''; $env:RAZORPAY_KEY_ID='rzp_test_mocklocal'; $env:RAZORPAY_KEY_SECRET='mock_key_secret_local'; $env:RAZORPAY_WEBHOOK_SECRET='mock_webhook_secret_local'; $env:RAZORPAY_API_BASE='http://127.0.0.1:8099/v1'; .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8001"
+      ],
+      "port": 8001
+    },
+    {
+      "name": "free-tier-backend-8011",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd backend; $env:DATABASE_URL='sqlite:///./e2e_free_tier.db'; $env:ALLOWED_ORIGINS='http://localhost:5184'; $env:DASHBOARD_URL='http://localhost:5184'; $env:SMTP_HOST=''; .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8011"
+      ],
+      "port": 8011,
+      "autoPort": false
+    },
+    {
+      "name": "free-tier-dashboard-5184",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd dashboard; $env:VITE_API_BASE_URL='http://localhost:8011'; npx.cmd vite --port 5184 --strictPort"
+      ],
+      "port": 5184,
+      "autoPort": false
+    },
+    {
+      "name": "website-5172",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "cd website; npx.cmd vite --port 5172 --strictPort"],
+      "port": 5172
+    },
+    {
+      "name": "admin-console-5175",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd admin-console; $env:VITE_API_BASE_URL='http://localhost:8001'; npx.cmd vite --port 5175 --strictPort"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "test-dashboard-5174",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd dashboard; $env:VITE_API_BASE_URL='http://localhost:8001'; npx.cmd vite --port 5174 --strictPort"
+      ],
+      "port": 5174
+    }
+  ]
+}
+

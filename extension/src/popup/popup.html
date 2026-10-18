@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentShield</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!-- Layout and styling only: every id below is read by popup.ts and must stay -->
+  <header class="header">
+    <div class="logo-wrapper">
+      <img src="/icons/icon-48.png" alt="" class="brand-logo-img" />
+      <div>
+        <h1 class="brand-name">AgentShield</h1>
+        <span class="brand-tag">AI Data Protection</span>
+      </div>
+    </div>
+    <div id="status-pill" class="status-pill offline">
+      <span class="status-dot"></span>
+      <span id="status-text">Locked</span>
+    </div>
+  </header>
+  <div class="popup-container">
+
+    <!-- Licence ended / not available: this browser is still activated, the company's plan is not -->
+    <section id="expired-view" style="display:none;">
+      <div class="card expired-card">
+        <div class="activation-title" id="expired-title">Your plan has ended</div>
+        <p class="hint" id="expired-msg">AI tools are blocked until your company has an active plan.</p>
+        <div class="hint" id="expired-date"></div>
+        <button id="upgrade-btn" type="button" class="btn btn-primary">Choose a plan</button>
+        <button id="recheck-btn" type="button" class="btn btn-secondary">Check again</button>
+        <div class="hint">After you subscribe, click <em>Check again</em> (or wait up to 5 minutes). No reinstall needed.</div>
+      </div>
+    </section>
+
+    <!-- Activation (shown until the server authorizes this browser) -->
+    <section id="locked-view" style="display:none;">
+      <!-- AgentShield Windows app installed on this PC: connect without a code -->
+      <div class="card pc-app-card" id="pc-app-card" style="display:none;">
+        <div class="activation-title">Connect with the AgentShield app</div>
+        <p class="hint" id="pc-app-text">The AgentShield app on this PC connects every browser at once.</p>
+        <button id="pc-app-btn" type="button" class="btn btn-primary">Connect this browser</button>
+      </div>
+
+      <div class="card">
+        <div class="activation-title">Activate this browser</div>
+        <p class="hint">AI tools are blocked in this browser until it is activated with your AgentShield account.</p>
+
+        <div class="steps">
+          <div class="step">
+            <span class="step-num">1</span>
+            <div>
+              <strong>Create an account or sign in</strong>
+              <div class="hint">Open the <a href="#" id="open-dashboard-1">AgentShield dashboard</a> and sign in (or click <em>Create account</em>).</div>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <div>
+              <strong>Generate your code</strong>
+              <div class="hint">In <a href="#" id="open-dashboard-2">My activation</a>, click <em>Generate activation code</em> and copy it.</div>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <div>
+              <strong>Paste it below</strong>
+              <div class="hint">The code works once, for this browser, for 30 minutes.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form class="card" id="activate-form">
+        <div class="card-title">Activation code</div>
+        <textarea id="act-code" class="field mono" rows="3" placeholder="ASA1...." spellcheck="false" required></textarea>
+        <button id="act-btn" type="submit" class="btn btn-primary">Connect and verify</button>
+      </form>
+
+      <div class="card">
+        <div class="card-title">Connection status</div>
+        <div class="conn-row">
+          <span id="conn-dot" class="conn-dot"></span>
+          <span id="conn-state" class="font-semibold">LOCKED</span>
+        </div>
+        <div id="conn-msg" class="hint"></div>
+        <button id="retry-btn" type="button" class="btn btn-secondary" style="display:none;">Retry connection</button>
+      </div>
+    </section>
+
+    <!-- Activated -->
+    <section id="active-view" style="display:none;">
+      <div id="success-banner" class="success-banner" style="display:none;">Activation confirmed by your organization's server. Protection is on.</div>
+      <div id="plan-card" class="plan-card">
+        <div class="plan-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div class="plan-main">
+          <div class="plan-kicker">Current plan</div>
+          <div class="plan-name" id="plan-name">Free trial</div>
+          <div class="plan-sub" id="plan-ends">-</div>
+        </div>
+        <div class="plan-days"><span id="plan-days">-</span><span class="plan-days-label" id="plan-days-label">days left</span></div>
+      </div>
+      <div id="renew-banner" class="renew-banner" style="display:none;">
+        <span id="renew-text">Your plan ends soon.</span>
+        <a href="#" id="renew-link">Choose a plan</a>
+      </div>
+      <div id="paused-banner" class="renew-banner paused-banner" style="display:none;" role="status">
+        <span id="paused-text">Protection paused: free monthly checks used.</span>
+        <a href="#" id="paused-upgrade">Upgrade</a>
+      </div>
+      <div class="card">
+        <div class="card-title">Account</div>
+        <dl class="kv">
+          <div class="kv-row"><dt>Signed in as</dt><dd id="user-id-val">-</dd></div>
+          <div class="kv-row"><dt>Organization</dt><dd id="org-name">-</dd></div>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Active protection</div>
+        <div class="rules-grid">
+          <div class="rule-stat stat-block">
+            <span class="count" id="count-block">0</span>
+            <span class="type">Block rules</span>
+          </div>
+          <div class="rule-stat stat-warn">
+            <span class="count" id="count-warn">0</span>
+            <span class="type">Warn rules</span>
+          </div>
+          <div class="rule-stat stat-redact">
+            <span class="count" id="count-redact">0</span>
+            <span class="type">Mask rules</span>
+          </div>
+        </div>
+        <dl class="kv">
+          <div class="kv-row"><dt>Website rules</dt><dd id="domain-stats">-</dd></div>
+          <div class="kv-row"><dt>Policy version</dt><dd><span id="policy-version" class="badge">v1</span></dd></div>
+          <div class="kv-row"><dt>Last synced</dt><dd id="last-sync">-</dd></div>
+        </dl>
+        <div id="sync-error" class="sync-error" style="display:none;"></div>
+      </div>
+
+      <div class="action-buttons">
+        <button id="sync-btn" class="btn btn-primary">Sync policies</button>
+        <button id="signout-btn" class="btn btn-secondary">Sign out this browser</button>
+      </div>
+
+      <div class="privacy-banner">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span>Prompts and file uploads to AI tools are checked on this computer. Policy violations are reported to your organization with secrets masked.</span>
+      </div>
+
+      <div class="meta-footer">
+        <span>Extension <span id="ext-version">-</span></span>
+        <span>Session renews <span id="session-exp">-</span></span>
+      </div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

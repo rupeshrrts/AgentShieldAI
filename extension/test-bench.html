@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentShield POC - AI Chat Simulator & Test Bench</title>
+  <link rel="stylesheet" href="src/content/styles.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f8fafc;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .links a {
+      color: #2563eb;
+      text-decoration: none;
+      font-size: 13px;
+      margin-left: 20px;
+      font-weight: 600;
+    }
+    .links a:hover { text-decoration: underline; }
+
+    main {
+      flex: 1;
+      max-width: 900px;
+      width: 100%;
+      margin: 32px auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .preset-panel {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    }
+    .preset-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+      margin-bottom: 14px;
+    }
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .preset-btn {
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .preset-btn:hover {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+    .preset-btn-name {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .preset-btn-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .badge-block { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .badge-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    .badge-redact { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .badge-allow { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .preset-btn-desc {
+      font-size: 11px;
+      color: #64748b;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chat-simulator {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.08);
+    }
+    .chat-header {
+      padding: 14px 20px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+    }
+    .chat-messages {
+      padding: 24px 20px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: #f8fafc;
+    }
+    .msg {
+      padding: 12px 16px;
+      border-radius: 12px;
+      max-width: 80%;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .msg-bot {
+      background: #ffffff;
+      color: #1e293b;
+      align-self: flex-start;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .msg-user {
+      background: #2563eb;
+      color: #ffffff;
+      align-self: flex-end;
+    }
+
+    .chat-input-area {
+      padding: 16px 20px;
+      background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .prompt-box {
+      flex: 1;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #0f172a;
+      font-size: 14px;
+      line-height: 1.4;
+      resize: vertical;
+      min-height: 60px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .prompt-box:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+    .send-btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+      height: 48px;
+    }
+    .send-btn:hover {
+      background: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="icons/icon-48.png" width="36" height="36" style="object-fit: contain;" alt="AgentShield Logo" />
+      <div>
+        <div class="brand-title">AgentShield AI Simulator</div>
+        <div class="brand-sub">Test Bench Playground for Chrome Extension Policy Interception</div>
+      </div>
+    </div>
+    <div class="links">
+      <a href="http://localhost:5173" target="_blank">Open Admin Dashboard</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Seeded Test Prompt Presets (as specified in POC Guide) -->
+    <section class="preset-panel">
+      <div class="preset-title">1-Click Test Scenarios (POC Specification Guide)</div>
+      <div class="preset-buttons">
+        <button class="preset-btn" data-prompt="sk-demo-EXAMPLE123456789">
+          <div class="preset-btn-name">
+            <span>API Key Token</span>
+            <span class="preset-btn-badge badge-block">BLOCK</span>
+          </div>
+          <div class="preset-btn-desc">sk-demo-EXAMPLE123456789</div>
+        </button>
+
+        <button class="preset-btn" data-prompt="Contact demo.user@example.com for database credentials">
+          <div class="preset-btn-name">
+            <span>Email Address</span>
+            <span class="preset-btn-badge badge-warn">WARN</span>
+          </div>
+          <div class="preset-btn-desc">demo.user@example.com</div>
+        </button>
+
+        <button class="preset-btn" data-prompt="Draft public PR announcement for PROJECT-ALPHA-CONFIDENTIAL">
+          <div class="preset-btn-name">
+            <span>Restricted Keyword</span>
+            <span class="preset-btn-badge badge-redact">REDACT</span>
+          </div>
+          <div class="preset-btn-desc">PROJECT-ALPHA-CONFIDENTIAL</div>
+        </button>
+
+        <button class="preset-btn" data-prompt="Explain Python list comprehensions and best practices">
+          <div class="preset-btn-name">
+            <span>Clean Prompt</span>
+            <span class="preset-btn-badge badge-allow">ALLOW</span>
+          </div>
+          <div class="preset-btn-desc">Harmless coding query</div>
+        </button>
+
+        <button class="preset-btn" id="test-site-block-btn" style="border: 1px solid #fecaca; background: #fef2f2;">
+          <div class="preset-btn-name">
+            <span style="color: #b91c1c;">🚫 Blocked Site Test</span>
+            <span class="preset-btn-badge badge-block">SITE BLOCK</span>
+          </div>
+          <div class="preset-btn-desc" style="color: #b91c1c;">Open https://www.ilovepdf.com</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- Simulated Chat Web Interface -->
+    <div class="chat-simulator">
+      <div class="chat-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span>AI Assistant (Mock ChatGPT Interface)</span>
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569;">
+            🏢 <label for="company-select" style="font-weight: 600;">Tenant / Company:</label>
+            <select
+              id="company-select"
+              style="background: #ffffff; border: 1px solid #cbd5e1; color: #0f172a; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; outline: none;"
+            >
+              <option value="Acme Corp">Acme Corp</option>
+              <option value="Motwane Manufacturing">Motwane Manufacturing</option>
+              <option value="CyberDyne Systems">CyberDyne Systems</option>
+              <option value="Global Logistics Ltd">Global Logistics Ltd</option>
+            </select>
+          </span>
+        </div>
+        <span style="color: #16a34a; font-weight: 600;">● Extension Connected</span>
+      </div>
+
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg msg-bot">
+          Hello! I am your AI assistant. How can I help you today? Type or select a sample prompt above to test AgentShield inspection.
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <!-- Textarea matches site adapter selector: #prompt-input, textarea -->
+        <textarea
+          id="prompt-input"
+          class="prompt-box ai-prompt-box"
+          placeholder="Message AI assistant... (Press Enter or Send)"
+        ></textarea>
+        <!-- Button matches site adapter selector: #send-btn, button[data-testid="send-button"] -->
+        <button id="send-btn" class="send-btn" data-testid="send-button">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Send
+        </button>
+      </div>
+  </main>
+
+  <script src="test-bench.js"></script>
+  <script>
+    // Only load dist/content/content.js if the extension content script hasn't already loaded
+    if (!window.__agentShieldContentInitialized) {
+      const s = document.createElement('script');
+      s.src = 'dist/content/content.js';
+      document.body.appendChild(s);
+    }
+  </script>
+</body>
+</html>

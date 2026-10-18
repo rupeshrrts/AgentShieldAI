@@ -1,0 +1,9 @@
+{
+  "name": "agentshieldai",
+  "private": true,
+  "description": "Run the whole AgentShieldAI project locally: npm start",
+  "scripts": {
+    "start": "node start.js",
+    "reset": "node start.js --reset"
+  }
+}

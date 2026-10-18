@@ -1,0 +1,121 @@
+{
+  "generated_at": "2026-10-17T06:47:35.207Z",
+  "source": "HaGeZi DNS blocklists",
+  "license": "GPL-3.0",
+  "categories": {
+    "malware": {
+      "domains": 226483,
+      "removed_protected": 1401,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.mini-onlydomains.txt",
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/fake-onlydomains.txt"
+      ]
+    },
+    "adult": {
+      "domains": 92084,
+      "removed_protected": 290,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/nsfw-onlydomains.txt"
+      ],
+      "agentshield_additions": {
+        "domains": 0,
+        "name_patterns": 0,
+        "host_keywords": [
+          "porn",
+          "xxx",
+          "xvideo",
+          "xnxx",
+          "xhamster",
+          "hentai",
+          "nsfw",
+          "nudes",
+          "sexy",
+          "milf",
+          "boobs",
+          "camgirl",
+          "chudai",
+          "desisex",
+          "antarvasna",
+          "kamukta"
+        ],
+        "exclude_domains": []
+      }
+    },
+    "piracy": {
+      "domains": 55998,
+      "removed_protected": 73,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/anti.piracy-onlydomains.txt"
+      ],
+      "agentshield_additions": {
+        "domains": 4,
+        "name_patterns": 66,
+        "host_keywords": [
+          "torrent"
+        ],
+        "exclude_domains": []
+      }
+    },
+    "gambling": {
+      "domains": 134567,
+      "removed_protected": 24,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.mini-onlydomains.txt"
+      ]
+    },
+    "social": {
+      "domains": 8244,
+      "removed_protected": 1,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/social-onlydomains.txt"
+      ],
+      "agentshield_additions": {
+        "domains": 0,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": [
+          "linkedin.com",
+          "licdn.com",
+          "linkedin.cn",
+          "linkedin.at",
+          "linkedin.be",
+          "linkedin.nl",
+          "reddit.com",
+          "redd.it",
+          "redditmedia.com",
+          "redditstatic.com"
+        ]
+      }
+    },
+    "bypass": {
+      "domains": 15711,
+      "removed_protected": 618,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/doh-vpn-proxy-bypass-onlydomains.txt"
+      ]
+    },
+    "streaming": {
+      "domains": 0,
+      "removed_protected": 0,
+      "sources": [],
+      "agentshield_additions": {
+        "domains": 51,
+        "name_patterns": 17,
+        "host_keywords": [
+          "mp3",
+          "mp4",
+          "song",
+          "movie",
+          "bhojpuri",
+          "filmy",
+          "ringtone",
+          "lyrics",
+          "webseries",
+          "pagal",
+          "masti"
+        ],
+        "exclude_domains": []
+      }
+    }
+  }
+}

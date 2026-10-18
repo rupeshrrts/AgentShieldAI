@@ -1,0 +1,78 @@
+# Environments & Credentials
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
+*.key
+*.cert
+# Per-PC extension config written by the installers (contains the device key)
+extension/client-config.json
+# Extension signing key (private) and built packages
+keys/
+dist-installer/package/
+build-extension/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+ENV/
+build/
+build-installer/
+*.spec
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+agentshield.db
+backend/agentshield.db
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dashboard/dist/
+extension/dist/
+_metadata/
+extension/_metadata/
+
+# Vercel CLI link folders and logs
+.vercel/
+*.log
+
+# Docker Local Overrides
+docker-compose.override.yml
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
