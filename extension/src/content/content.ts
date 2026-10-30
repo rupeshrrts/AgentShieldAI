@@ -21,7 +21,7 @@ import {
   PolicyRule,
   SecurityEventPayload,
 } from '../shared/types';
-import { ACTION_PRIORITY, actionForRule, evaluateFindings, RULE_LABELS } from '../shared/policy';
+import { ACTION_PRIORITY, actionForRule, evaluateFindings, policiesComplete, RULE_LABELS } from '../shared/policy';
 
 const APPROVAL_TTL_MS = 5000;
 const MAX_SCAN_BYTES = 2 * 1024 * 1024;
@@ -57,6 +57,8 @@ class ContentController {
   private detector: LocalDetector;
   private overlay!: AgentShieldOverlay; // created only on supported AI sites
   private activePolicies: PolicyRule[] = [];
+  // True only when the synced rules hold every catalog rule. Until then nothing is sent (fail closed).
+  private policiesReady = false;
   private settings: ExtensionSettings = {
     store_clean_prompt_text: false,
     store_violation_prompt_text: true,
@@ -155,6 +157,7 @@ class ContentController {
     }
     if (Array.isArray(data.policies)) {
       this.activePolicies = data.policies;
+      this.policiesReady = policiesComplete(data.policies);
     }
     // Keywords stay on the built-in defaults until the first successful sync with the dashboard
     if (Array.isArray(data.keywords)) {
@@ -236,6 +239,11 @@ class ContentController {
     }
     // Free monthly prompt checks used up: the prompt goes through unchecked until they reset or the plan changes
     if (this.checksPaused) return false;
+    // The rules are not known yet (first sync pending): nothing is sent until the dashboard's rules are loaded
+    if (!this.policiesReady) {
+      void this.showRulesLoading('Prompt not sent');
+      return true;
+    }
     if (this.isApproved(promptText)) return false;
 
     const evaluation = this.evaluateText(promptText);
@@ -262,6 +270,20 @@ class ContentController {
         needs_confirmation: false,
       },
       { title, subtitle: 'Activation required' }
+    );
+  }
+
+  private showRulesLoading(title: string): Promise<void> {
+    return this.overlay.showBlockModal(
+      {
+        action: 'BLOCK',
+        primary_rule_id: 'access.rules_loading',
+        highest_severity: 'MEDIUM',
+        reason: 'AgentShield has not received your organization\'s protection rules yet, so nothing is sent. This usually takes a few seconds: try again.',
+        findings: [],
+        needs_confirmation: false,
+      },
+      { title, subtitle: 'Protection rules loading' }
     );
   }
 
@@ -418,7 +440,11 @@ class ContentController {
       'drop',
       (e: DragEvent) => {
         const files = Array.from(e.dataTransfer?.files || []);
-        if (!files.length || files.every((f) => this.approvedFiles.has(f))) return;
+        if (!files.length) {
+          this.checkInsertedText(e, e.dataTransfer?.getData('text/plain') || '', 'Drop blocked', 'drop_blocked');
+          return;
+        }
+        if (files.every((f) => this.approvedFiles.has(f))) return;
         this.stop(e);
         const target = e.target as EventTarget;
         const { clientX, clientY } = e;
@@ -437,7 +463,11 @@ class ContentController {
       'paste',
       (e: ClipboardEvent) => {
         const files = Array.from(e.clipboardData?.files || []);
-        if (!files.length || files.every((f) => this.approvedFiles.has(f))) return;
+        if (!files.length) {
+          this.checkInsertedText(e, e.clipboardData?.getData('text/plain') || '', 'Paste blocked', 'paste_blocked');
+          return;
+        }
+        if (files.every((f) => this.approvedFiles.has(f))) return;
         this.stop(e);
         const target = e.target as EventTarget;
         void this.checkFiles(files).then((allowed) => {
@@ -450,6 +480,22 @@ class ContentController {
       },
       true
     );
+  }
+
+  /**
+   * Text pasted or dropped into the prompt box is checked at once with the same rules, so data that an
+   * enabled rule BLOCKS never even reaches the box. Everything else is checked again when it is sent.
+   */
+  private checkInsertedText(e: Event, text: string, title: string, outcome: string) {
+    if (!text.trim()) return;
+    // Not connected, rules not loaded or checks paused: the send-time gate decides, as before
+    if (!this.authorized || this.checksPaused || !this.policiesReady) return;
+    if (!this.isInPromptArea(asElement(e.target))) return;
+    const result = this.evaluateText(text);
+    if (result.action !== 'BLOCK') return;
+    this.stop(e);
+    this.reportPromptEvent(result, text, 'BLOCK', outcome);
+    void this.overlay.showBlockModal(result, { title, subtitle: 'Remove the sensitive data before putting it into an AI tool.' });
   }
 
   private isTextFile(file: File): boolean {
@@ -468,8 +514,12 @@ class ContentController {
       await this.showActivationRequired('File upload blocked');
       return false;
     }
+    if (!this.policiesReady) {
+      await this.showRulesLoading('File upload blocked');
+      return false;
+    }
     const host = this.host();
-    const fileRule = actionForRule('file.upload', 'FILE', 'MEDIUM', this.activePolicies, host);
+    const fileRule = actionForRule('file.upload', this.activePolicies, host);
     const fileAction: PolicyAction = this.userStatus === 'SUSPENDED' ? 'BLOCK' : fileRule ? fileRule.action : 'ALLOW';
 
     // Scan text-based files with the same rules as prompts

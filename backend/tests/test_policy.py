@@ -101,3 +101,41 @@ def test_disabled_policy_is_ignored():
     res = PolicyEvaluator.evaluate(findings, policies)
     # Since explicitly defined policy is disabled, it is skipped
     assert res.action == "ALLOW"
+
+
+def test_disabled_rule_is_not_enforced_even_with_a_blocking_default():
+    """Switching a rule Off in the dashboard must stop it: no category default may take over."""
+    findings = DetectorEngine().detect("sk-demo-EXAMPLE123456789 and demo.user@example.com")
+    policies = [
+        PolicyRule(id="p1", rule_id="secret.api_key_like", action="BLOCK", severity="HIGH", enabled=False),
+        PolicyRule(id="p2", rule_id="pii.email", action="WARN", severity="MEDIUM", enabled=False),
+    ]
+    res = PolicyEvaluator.evaluate(findings, policies)
+    assert res.action == "ALLOW"
+    assert res.primary_rule_id is None
+
+
+def test_rule_without_a_policy_row_is_not_enforced():
+    """Only an enabled policy enforces a rule; a missing row must not fall back to a default action."""
+    findings = DetectorEngine().detect("sk-demo-EXAMPLE123456789")
+    res = PolicyEvaluator.evaluate(findings, [])
+    assert res.action == "ALLOW"
+
+
+def test_enabled_rule_enforces_only_its_own_site_scope():
+    findings = DetectorEngine().detect("sk-demo-EXAMPLE123456789")
+    policies = [
+        PolicyRule(id="p1", rule_id="secret.api_key_like", action="BLOCK", severity="HIGH", enabled=True, site_scope="chatgpt.com"),
+    ]
+    assert PolicyEvaluator.evaluate(findings, policies, site="chatgpt.com").action == "BLOCK"
+    assert PolicyEvaluator.evaluate(findings, policies, site="app.chatgpt.com").action == "BLOCK"
+    assert PolicyEvaluator.evaluate(findings, policies, site="claude.ai").action == "ALLOW"
+
+
+def test_enabled_row_wins_over_a_disabled_row_for_the_same_rule():
+    findings = DetectorEngine().detect("sk-demo-EXAMPLE123456789")
+    policies = [
+        PolicyRule(id="p1", rule_id="secret.api_key_like", action="BLOCK", severity="HIGH", enabled=False),
+        PolicyRule(id="p2", rule_id="secret.api_key_like", action="WARN", severity="HIGH", enabled=True),
+    ]
+    assert PolicyEvaluator.evaluate(findings, policies).action == "WARN"

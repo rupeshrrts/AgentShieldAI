@@ -49,10 +49,55 @@ export function verhoeffValid(digits: string): boolean {
   return c === 0;
 }
 
+const BASE36 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/** GSTIN check character (the GST Network's mod-36 algorithm over the first 14 characters). */
+export function gstinValid(gstin: string): boolean {
+  if (gstin.length !== 15) return false;
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    const v = BASE36.indexOf(gstin[i]);
+    if (v < 0) return false;
+    const p = v * (i % 2 === 0 ? 1 : 2);
+    sum += Math.floor(p / 36) + (p % 36);
+  }
+  return BASE36[(36 - (sum % 36)) % 36] === gstin[14];
+}
+
+/** IBAN mod-97 check (ISO 13616); spaces are ignored. */
+export function ibanValid(iban: string): boolean {
+  const s = iban.replace(/ /g, '').toUpperCase();
+  if (s.length < 15 || s.length > 34) return false;
+  let mod = 0;
+  for (const ch of s.slice(4) + s.slice(0, 4)) {
+    const v = BASE36.indexOf(ch);
+    if (v < 0) return false;
+    for (const d of String(v)) mod = (mod * 10 + Number(d)) % 97;
+  }
+  return mod === 1;
+}
+
+/** Common UPI handles (the part after @). Only these count, so ordinary @mentions are not UPI IDs. */
+export const UPI_HANDLES = [
+  'ybl', 'ibl', 'axl', 'okaxis', 'okhdfcbank', 'okicici', 'oksbi', 'paytm', 'ptyes', 'ptaxis', 'pthdfc', 'ptsbi',
+  'apl', 'yapl', 'upi', 'icici', 'sbi', 'hdfcbank', 'axisbank', 'kotak', 'idfcbank', 'idfcfirst', 'indus', 'federal',
+  'pnb', 'boi', 'unionbank', 'barodampay', 'aubank', 'airtel', 'freecharge', 'jupiteraxis', 'fbl', 'waicici',
+  'wahdfcbank', 'wasbi', 'waaxis', 'abfspay', 'ikwik', 'mbk', 'slice', 'naviaxis', 'yesbank', 'rbl', 'dbs', 'kbl',
+  'cnrb', 'equitas', 'jio', 'superyes', 'amazonpay', 'postbank',
+];
+
+/** A password part that is only a placeholder (connection-string examples are not secrets). */
+const PLACEHOLDER = /^(?:\*+|x+|<[^>]*>|\$\{[^}]*\}|\{[^}]*\}|password|pass|pwd|secret|changeme)$/i;
+
 /** Findings that are never sent or stored in readable form. */
-export const ALWAYS_MASKED_RULES = new Set(['secret.api_key_like', 'pii.credit_card', 'pii.aadhaar']);
+export const ALWAYS_MASKED_RULES = new Set([
+  'secret.api_key_like', 'pii.credit_card', 'pii.aadhaar',
+  'secret.crypto_key', 'secret.connection_string', 'pii.iban', 'pii.bank_account', 'pii.passport', 'pii.voter_id',
+]);
 
 const ALNUM = /[\p{L}\p{N}]/u;
+
+const overlaps = (spans: Array<[number, number]>, start: number, end: number) => spans.some(([s, e]) => start < e && end > s);
 
 export class LocalDetector {
   // Common patterns for secrets, credentials, tokens and private keys
@@ -89,6 +134,44 @@ export class LocalDetector {
 
   // Indian PAN: 5 letters (4th = holder type), 4 digits, 1 letter
   private static PAN_PATTERN = /\b[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]\b/g;
+
+  // --- 2.6 data rules. Patterns that need a nearby word put the value in group 1 at the END of the match.
+
+  // Connection strings with a password: scheme://user:password@host (group 1 = password)
+  private static CONNECTION_PATTERN = /\b[A-Za-z][A-Za-z0-9+.-]{1,20}:\/\/[^\s:\/@'"]+:([^\s@\/'"]{3,})@[^\s\/'"]+/g;
+
+  // Crypto wallet private keys: Bitcoin WIF (uncompressed / compressed), BIP32 xprv, 64-hex key next to a key word
+  private static CRYPTO_PATTERNS = [
+    /\b5[HJK][1-9A-HJ-NP-Za-km-z]{49}\b/g,
+    /\b[KL][1-9A-HJ-NP-Za-km-z]{51}\b/g,
+    /\bxprv[1-9A-HJ-NP-Za-km-z]{107,108}\b/g,
+    /\b(?:private[\s_-]?key|priv[\s_-]?key|wallet[\s_-]?key|seed)\b[^\n]{0,20}?\b(?:0x)?([a-fA-F0-9]{64})\b/gi,
+  ];
+
+  // IBAN: country code, 2 check digits, 11-30 letters/digits (optionally in groups), mod-97 checked
+  private static IBAN_PATTERN = /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}\b/g;
+
+  // UPI ID: name@handle with a known UPI handle, not followed by a domain ending (that would be an email)
+  private static UPI_PATTERN = new RegExp(
+    `\\b[A-Za-z0-9][A-Za-z0-9._-]{1,255}@(?:${UPI_HANDLES.join('|')})(?!\\.?[A-Za-z0-9-])`,
+    'gi'
+  );
+
+  // GSTIN: state code, PAN, entity number, Z, check character (checked)
+  private static GSTIN_PATTERN = /\b(?:0[1-9]|[12]\d|3[0-8]|97|99)[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/g;
+
+  // Indian passport number, only when the word "passport" comes shortly before it (group 1)
+  private static PASSPORT_PATTERN = /\bpassport\b[^\n]{0,40}?\b([A-PR-WY][1-9]\d{6})\b/gi;
+
+  // Voter ID (EPIC): 3 letters + 7 digits, only with "voter", "EPIC" or "election" shortly before it (group 1)
+  private static VOTER_PATTERN = /\b(?:voter|epic|election)\b[^\n]{0,40}?\b([A-Z]{3}\d{7})\b/gi;
+
+  // Indian bank details: IFSC code, or a 9-18 digit account number after "account" / "a/c" / "acct" (group 1)
+  private static IFSC_PATTERN = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
+  private static ACCOUNT_PATTERN = /\b(?:a\/c|acct|account)(?:\s*(?:no|number|num)\.?)?(?:\s*is)?\s*[:#-]?\s*(\d{9,18})\b/gi;
+
+  // Internal (private) IPv4 addresses: 10.x, 172.16-31.x, 192.168.x (not part of a longer dotted number)
+  private static PRIVATE_IP_PATTERN = /\b(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})\b(?!\.\d)/g;
 
   // Built-in confidential codewords, used only until the dashboard list is synced
   public static DEFAULT_KEYWORDS = [
@@ -136,19 +219,52 @@ export class LocalDetector {
     const findings: Finding[] = [];
     const add = (rule_id: string, category: Finding['category'], severity: Finding['severity'], m: RegExpExecArray) =>
       findings.push({ rule_id, category, severity, start: m.index, end: m.index + m[0].length, matched_value: m[0] });
+    // Value in group 1 at the end of the match (the words before it are only context)
+    const addGroup = (rule_id: string, category: Finding['category'], severity: Finding['severity'], m: RegExpExecArray): [number, number] => {
+      const end = m.index + m[0].length;
+      const start = end - m[1].length;
+      findings.push({ rule_id, category, severity, start, end, matched_value: m[1] });
+      return [start, end];
+    };
 
     // 1. API keys, tokens, private keys and password definitions
     for (const pattern of LocalDetector.API_KEY_PATTERNS) {
       for (const m of LocalDetector.matches(pattern, text)) add('secret.api_key_like', 'SECRET', 'HIGH', m);
     }
 
-    // 2. Email addresses
-    for (const m of LocalDetector.matches(LocalDetector.EMAIL_PATTERN, text)) add('pii.email', 'PII', 'MEDIUM', m);
+    // 1b. Connection strings with a real password, and crypto wallet private keys
+    const connectionSpans: Array<[number, number]> = [];
+    for (const m of LocalDetector.matches(LocalDetector.CONNECTION_PATTERN, text)) {
+      if (PLACEHOLDER.test(m[1])) continue;
+      add('secret.connection_string', 'SECRET', 'HIGH', m);
+      connectionSpans.push([m.index, m.index + m[0].length]);
+    }
+    for (const pattern of LocalDetector.CRYPTO_PATTERNS) {
+      for (const m of LocalDetector.matches(pattern, text)) {
+        if (m[1] !== undefined) addGroup('secret.crypto_key', 'SECRET', 'HIGH', m);
+        else add('secret.crypto_key', 'SECRET', 'HIGH', m);
+      }
+    }
+
+    // 2. Email addresses (not the user:password@host part of a connection string)
+    for (const m of LocalDetector.matches(LocalDetector.EMAIL_PATTERN, text)) {
+      if (overlaps(connectionSpans, m.index, m.index + m[0].length)) continue;
+      add('pii.email', 'PII', 'MEDIUM', m);
+    }
+
+    // 2b. IBAN (checked), before cards so its digits are not read as a card or Aadhaar number
+    const ibanSpans: Array<[number, number]> = [];
+    for (const m of LocalDetector.matches(LocalDetector.IBAN_PATTERN, text)) {
+      if (!ibanValid(m[0])) continue;
+      add('pii.iban', 'PII', 'HIGH', m);
+      ibanSpans.push([m.index, m.index + m[0].length]);
+    }
 
     // 3. Payment card numbers
-    const numberSpans: Array<[number, number]> = [];
+    const numberSpans: Array<[number, number]> = [...ibanSpans];
     for (const m of LocalDetector.matches(LocalDetector.CARD_PATTERN, text)) {
       const digits = m[0].replace(/\D/g, '');
+      if (overlaps(ibanSpans, m.index, m.index + m[0].length)) continue;
       if (digits.length >= 13 && digits.length <= 19 && new Set(digits).size > 1 && luhnValid(digits)) {
         add('pii.credit_card', 'PII', 'HIGH', m);
         numberSpans.push([m.index, m.index + m[0].length]);
@@ -158,10 +274,29 @@ export class LocalDetector {
     // 4. Aadhaar numbers
     for (const m of LocalDetector.matches(LocalDetector.AADHAAR_PATTERN, text)) {
       const digits = m[0].replace(/\D/g, '');
+      if (overlaps(ibanSpans, m.index, m.index + m[0].length)) continue;
       if (digits.length === 12 && verhoeffValid(digits)) {
         add('pii.aadhaar', 'PII', 'HIGH', m);
         numberSpans.push([m.index, m.index + m[0].length]);
       }
+    }
+
+    // 4b. UPI IDs, GSTIN, passport and voter ID numbers, bank details, internal IP addresses
+    for (const m of LocalDetector.matches(LocalDetector.UPI_PATTERN, text)) {
+      add('pii.upi', 'PII', 'MEDIUM', m);
+      numberSpans.push([m.index, m.index + m[0].length]);
+    }
+    for (const m of LocalDetector.matches(LocalDetector.GSTIN_PATTERN, text)) {
+      if (gstinValid(m[0])) add('pii.gstin', 'PII', 'LOW', m);
+    }
+    for (const m of LocalDetector.matches(LocalDetector.PASSPORT_PATTERN, text)) addGroup('pii.passport', 'PII', 'HIGH', m);
+    for (const m of LocalDetector.matches(LocalDetector.VOTER_PATTERN, text)) addGroup('pii.voter_id', 'PII', 'MEDIUM', m);
+    for (const m of LocalDetector.matches(LocalDetector.IFSC_PATTERN, text)) add('pii.bank_account', 'PII', 'HIGH', m);
+    for (const m of LocalDetector.matches(LocalDetector.ACCOUNT_PATTERN, text)) {
+      numberSpans.push(addGroup('pii.bank_account', 'PII', 'HIGH', m));
+    }
+    for (const m of LocalDetector.matches(LocalDetector.PRIVATE_IP_PATTERN, text)) {
+      if (m[0].split('.').every((o) => Number(o) <= 255)) add('restricted.internal_ip', 'RESTRICTED', 'LOW', m);
     }
 
     // 5. PAN numbers

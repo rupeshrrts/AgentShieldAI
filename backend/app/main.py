@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.api import (
     api_tokens,
@@ -51,18 +51,34 @@ async def lifespan(app: FastAPI):
     environments start with a ready-to-use tenant, admin account and baseline
     policies, and deletes events older than each organization's retention period.
     """
-    Base.metadata.create_all(bind=engine)
+    # Startup must be quick: a free host that wakes up holds the first request (e.g. a sign-in) until the
+    # server is ready, and every statement here is a round trip to the database.
+    missing = set(Base.metadata.tables) - set(inspect(engine).get_table_names())
+    if missing:
+        Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
         init_db(db)
-        purge_expired_events(db)
     finally:
         db.close()
+    # Retention clean-up runs after the server is accepting requests (it also runs periodically on ingestion)
+    purge_task = asyncio.create_task(asyncio.to_thread(_purge_expired_events))
     # Trial/expiry reminders (informational; access is enforced on every request)
     reminder_task = asyncio.create_task(reminder_loop(SessionLocal)) if settings.REMINDER_LOOP_ENABLED else None
     yield
+    purge_task.cancel()
     if reminder_task:
         reminder_task.cancel()
+
+
+def _purge_expired_events() -> None:
+    db = SessionLocal()
+    try:
+        purge_expired_events(db)
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
 
 
 app = FastAPI(

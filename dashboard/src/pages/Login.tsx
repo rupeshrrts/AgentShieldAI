@@ -65,10 +65,19 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [signup, setSignup] = useState<{ enabled: boolean; allowed_domains: string[]; trial_days?: number; email_verification_required?: boolean } | null>(null);
+  // A server on a free host sleeps when idle and needs up to a minute to wake: say so instead of a silent spinner
+  const [slow, setSlow] = useState(false);
 
   useEffect(() => {
+    // Also wakes a sleeping server while the person is still typing
     api.getSignupInfo().then(setSignup).catch(() => setSignup(null));
   }, []);
+
+  useEffect(() => {
+    if (!loading) return setSlow(false);
+    const t = setTimeout(() => setSlow(true), 5000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -173,6 +182,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         {errorMsg && (
           <div className="callout" style={{ color: 'var(--color-danger-text)', background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger-border)', display: 'block' }}>
             {errorMsg}
+          </div>
+        )}
+        {slow && (
+          <div className="callout" role="status" style={{ color: 'var(--text-secondary)', background: 'var(--color-primary-bg)', border: '1px solid var(--border-default)', display: 'block' }}>
+            The AgentShield server is starting up after a quiet period. This can take up to a minute; please keep this page open.
           </div>
         )}
         {infoMsg && (

@@ -37,10 +37,17 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
   const [catalog, setCatalog] = useState<RuleCatalogItem[]>([]);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Rules as the server saved them after a change, shown at once (the page's full refresh follows a moment later).
+  // Without this a switch showed its old state until the refresh came back, so it looked as if the click had failed.
+  const [saved, setSaved] = useState<Record<string, Policy>>({});
 
   useEffect(() => {
     api.getRuleCatalog().then(setCatalog).catch(() => setCatalog([]));
   }, []);
+
+  // Every saved change increases the rule's version, so the newest copy wins. Refreshes started by quick clicks
+  // can come back out of order; an older one must not put a switch back to its old state.
+  const newest = (p: Policy): Policy => (saved[p.id] && saved[p.id].version > p.version ? saved[p.id] : p);
 
   const flash = (tone: 'ok' | 'error', text: string) => {
     setMessage({ tone, text });
@@ -50,8 +57,9 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
   const update = async (p: Policy, changes: Partial<Policy>, label: string) => {
     setBusy(p.id);
     try {
-      await api.updatePolicy(p.id, changes);
-      flash('ok', `${label}. Browsers pick this up within 5 minutes.`);
+      const updated = await api.updatePolicy(p.id, changes);
+      setSaved((prev) => ({ ...prev, [updated.id]: updated }));
+      flash('ok', `${label}. Connected browsers apply this within about a minute.`);
       onRefresh();
     } catch (e: any) {
       flash('error', e.message || 'Could not save the change.');
@@ -65,7 +73,7 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
     setBusy(preset);
     try {
       await api.applyPreset(preset);
-      flash('ok', `"${title}" preset applied. Browsers pick this up within 5 minutes.`);
+      flash('ok', `"${title}" preset applied. Connected browsers apply this within about a minute.`);
       onRefresh();
     } catch (e: any) {
       flash('error', e.message || 'Could not apply the preset.');
@@ -74,10 +82,10 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
     }
   };
 
-  const byRule = new Map(policies.map((p) => [p.rule_id, p]));
+  const byRule = new Map(policies.map((p) => [p.rule_id, newest(p)]));
   const rows = catalog.length
     ? catalog.map((c) => ({ c, p: byRule.get(c.rule_id) })).filter((r) => r.p)
-    : policies.map((p) => ({ c: undefined as RuleCatalogItem | undefined, p }));
+    : policies.map((p) => ({ c: undefined as RuleCatalogItem | undefined, p: newest(p) }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

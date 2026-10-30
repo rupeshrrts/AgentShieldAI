@@ -63,9 +63,9 @@ services:
       DEMO_MODE: ${DEMO_MODE:-false}
       CHROME_STORE_EXTENSION_ID: ${CHROME_STORE_EXTENSION_ID:-}
       EDGE_STORE_EXTENSION_ID: ${EDGE_STORE_EXTENSION_ID:-}
-      # Built extension package and installer (see INSTALL.md 1.4), offered for download in the portal
+      # Built extension package and the optional Network Agent (see INSTALL.md 1.4), offered for download in the portal
       EXTENSION_PACKAGE_DIR: /srv/agentshield-dist/package
-      SYSTEM_SETUP_PATH: /srv/agentshield-dist/AgentShield-System-Setup.exe
+      AGENT_PACKAGE_PATH: /srv/agentshield-dist/AgentShield-Agent.exe
     volumes:
       - ./dist-installer:/srv/agentshield-dist:ro
     ports:

@@ -41,6 +41,28 @@ The backend tests need **no credentials in code or in `.env`**: `backend/tests/c
 
 > **Fresh database:** run the backend suite on a new SQLite file. The phase-1 tests (`test_saas.py`) are not rerun-safe on a reused `test_agentshield.db` (they assume a clean database), so delete the file before each run, as in the commands above.
 
+### Results at version 2.6.0 / extension 1.9.0 (26 October 2026)
+
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **245 passed** (new: `test_policy_revision.py`, `test_policy_twins.py`, 4 evaluator cases) |
+| Extension unit | `cd extension; npm test` | **108 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
+| Dashboard | `cd dashboard; npm run build` | passes |
+| Store packages | `node scripts/packaging/store-packages.js --api-url https://… --dashboard-url https://…` | all checks pass (24 files, ≈3.1 MB); run here with placeholder addresses into a temporary folder, so no upload-ready package was kept |
+| **Real browser** | `cd extension; npm run test:e2e` | **39/39 passed** on Microsoft Edge 156 (headless) |
+
+The real-browser test (`extension/tests/e2e/rules-e2e.js`) starts the backend on a throwaway SQLite file with a random
+test admin, loads the unpacked extension (test build) in a temporary Edge profile with DNS off for everything except
+127.0.0.1, activates it with a real single-use code, then uses the dashboard's API calls to switch each control and
+checks the browser after each change:
+
+* every protection rule (API keys, email, phone, card, PAN, Aadhaar, keywords) Off → the prompt on `/test-bench` is sent; On → Block / Warn / Redact as configured; Off again → sent;
+* file uploads Off → attached; On → warning before attaching;
+* website categories (gambling On/Off, adult Off/On), Safe Search On/Off (Bing `adlt=strict`), "block unapproved AI tools" On/Off (an approved AI site stays open), a website BLOCK rule enabled/disabled;
+* one change applied with no manual sync, by the extension's own once-a-minute check (11 s in this run).
+
+Not covered: Google Chrome (branded Chrome 137+ refuses `--load-extension`, so only Edge can be automated; the package is the same), a manual run on a clean PC, and the real AI websites (their layouts are covered by the selectors, not by this test).
+
 ### Results at version 2.1.0 (17 October 2026)
 
 | Command | Result |

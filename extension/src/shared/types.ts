@@ -107,6 +107,8 @@ export interface ExtensionSyncState {
   is_active: boolean;
   is_online: boolean;
   policy_version: number;
+  /** Organization's blocking-configuration revision at the last full sync; a change triggers a resync. */
+  policy_revision?: number;
   last_synced_at: string;
   organization_id: string;
   organization_name: string;

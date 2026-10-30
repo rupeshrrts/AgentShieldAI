@@ -335,14 +335,11 @@
       </div>
   </main>
 
-  <script src="test-bench.js"></script>
-  <script>
-    // Only load dist/content/content.js if the extension content script hasn't already loaded
-    if (!window.__agentShieldContentInitialized) {
-      const s = document.createElement('script');
-      s.src = 'dist/content/content.js';
-      document.body.appendChild(s);
-    }
-  </script>
+  <!-- Absolute path: this page is served at /test-bench and at /extension/test-bench.html -->
+  <script src="/extension/test-bench.js"></script>
+  <!-- Checks come only from the installed, activated AgentShield extension. A copy of content.js loaded into the
+       page itself has no extension access, can never be activated, and would stop every prompt whatever the
+       dashboard's rules say, so none is loaded here. -->
+
 </body>
 </html>

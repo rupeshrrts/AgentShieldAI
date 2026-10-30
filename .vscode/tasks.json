@@ -1,0 +1,86 @@
+{
+  // AgentShieldAI local testing. Press Ctrl+Shift+B to start everything in VS Code terminals.
+  // Uses a local SQLite test database (backend/local_test.db), never the live Supabase database.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AgentShield: Start all",
+      "dependsOn": ["AgentShield: Backend :8000", "AgentShield: User dashboard :5173", "AgentShield: Developer console :5175"],
+      "dependsOrder": "parallel",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: Backend :8000",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+        "$env:DATABASE_URL='sqlite:///./local_test.db'; $env:ALLOWED_ORIGINS='http://localhost:5173,http://localhost:5175'; $env:DASHBOARD_URL='http://localhost:5173'; $env:ADMIN_CONSOLE_URL='http://localhost:5175'; $env:SMTP_HOST=''; if (-not (Test-Path .venv)) { python -m venv .venv; .venv\\Scripts\\python.exe -m pip install -q -r requirements.txt }; .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000 --reload"
+      ],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "presentation": { "group": "agentshield", "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: User dashboard :5173",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "if (-not (Test-Path node_modules)) { npm.cmd install --no-audit --no-fund }; npm.cmd run dev"],
+      "options": { "cwd": "${workspaceFolder}/dashboard" },
+      "isBackground": true,
+      "presentation": { "group": "agentshield", "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: Developer console :5175",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "if (-not (Test-Path node_modules)) { npm.cmd install --no-audit --no-fund }; npm.cmd run dev"],
+      "options": { "cwd": "${workspaceFolder}/admin-console" },
+      "isBackground": true,
+      "presentation": { "group": "agentshield", "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: Create developer login",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "$env:DATABASE_URL='sqlite:///./local_test.db'; .venv\\Scripts\\python.exe -m app.cli create-platform-owner --email ${input:ownerEmail}"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "presentation": { "reveal": "always", "panel": "new" },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: Build extension",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "if (-not (Test-Path node_modules)) { npm.cmd install --no-audit --no-fund }; node build.js"],
+      "options": { "cwd": "${workspaceFolder}/extension" },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: Reset test data",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-Command", "Remove-Item local_test.db -ErrorAction SilentlyContinue; 'Test data cleared. Restart the backend task.'"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentShield: Run backend tests",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "$env:DATABASE_URL='sqlite:///./test_agentshield.db'; Remove-Item test_agentshield.db -ErrorAction SilentlyContinue; .venv\\Scripts\\python.exe -m pytest tests -q"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    { "id": "ownerEmail", "type": "promptString", "description": "Email for your developer-console login (platform owner)" }
+  ]
+}

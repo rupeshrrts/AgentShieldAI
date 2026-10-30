@@ -17,7 +17,7 @@ const SOURCE_NAMES: Record<string, string> = {
   edge_add_ons: 'Edge Add-ons',
 };
 
-/** Machine-wide install through Chrome/Edge enterprise policies (AgentShield-System-Setup.exe or GPO). */
+/** Machine-wide install through Chrome/Edge enterprise policies (Group Policy, Intune or any MDM); no Windows program. */
 const SystemInstallSection: React.FC<{ copy: (t: string, l: string) => void; copied: string }> = ({ copy, copied }) => {
   const [info, setInfo] = useState<DistributionInfo | null | undefined>(undefined);
   useEffect(() => {
@@ -25,27 +25,18 @@ const SystemInstallSection: React.FC<{ copy: (t: string, l: string) => void; cop
   }, []);
 
   const server = api.getApiBaseUrlForDisplay();
-  const silent = `AgentShield-System-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SERVER=${server}`;
 
   return (
     <section className="glass-panel" style={{ padding: '24px' }}>
       <SectionHeader icon={<Monitor size={18} />} title="Install on company PCs">
-        Run <strong>AgentShield-System-Setup.exe</strong> once per PC as administrator, or push it silently with Group
-        Policy, Intune or SCCM. AgentShield is then installed for every user in Chrome and Edge and users cannot remove
-        it. The installer grants no access: each user still activates their browser with their own account.
+        Push AgentShield with Chrome and Edge enterprise policy (Group Policy, Intune or any MDM): add the value below to{' '}
+        <em>ExtensionInstallForcelist</em> and set the extension policy <em>apiUrl</em> to this server. No Windows program is
+        needed, and users cannot remove a force-installed extension. Installing grants no access: each user still activates
+        their browser with their own account.
       </SectionHeader>
 
       {info && (
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-          {info.downloads?.system_setup ? (
-            <button type="button" className="btn-primary" onClick={() => api.downloadFile('AgentShield-System-Setup.exe').catch((e) => window.alert(e.message))}>
-              <Download size={15} /> Download installer (.exe, for IT)
-            </button>
-          ) : (
-            <span style={{ fontSize: '12.5px', color: 'var(--color-warning-text)' }}>
-              Installer not built on this server yet (see INSTALL.md, step 3).
-            </span>
-          )}
           {info.downloads?.extension_zip && (
             <button type="button" className="btn-secondary" onClick={() => api.downloadFile('agentshield-extension.zip').catch((e) => window.alert(e.message))}>
               <Download size={15} /> Download extension (.zip, manual install)
@@ -80,24 +71,23 @@ const SystemInstallSection: React.FC<{ copy: (t: string, l: string) => void; cop
               <strong>Managed PCs only for now.</strong> Chrome and Edge install a self-hosted extension only on PCs that are
               joined to Active Directory or Microsoft Entra ID, or enrolled in Intune/MDM. For other PCs, publish AgentShield to
               the Chrome Web Store and Edge Add-ons and set <code>CHROME_STORE_EXTENSION_ID</code> /{' '}
-              <code>EDGE_STORE_EXTENSION_ID</code> on the server; the same installer then works everywhere.
+              <code>EDGE_STORE_EXTENSION_ID</code> on the server; the same policy then works everywhere.
             </div>
           )}
 
           <div>
             <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-              Silent install command (sets this server's address; no credential is included)
+              Extension policy <em>apiUrl</em> (this server's address; no credential is included)
             </div>
             <div className="code-box code-box-sm">
-              <code>{silent}</code>
-              <button type="button" className="btn-secondary" onClick={() => copy(silent, 'silent')}>
-                <Copy size={14} /> {copied === 'silent' ? 'Copied' : 'Copy'}
+              <code>{server}</code>
+              <button type="button" className="btn-secondary" onClick={() => copy(server, 'apiUrl')}>
+                <Copy size={14} /> {copied === 'apiUrl' ? 'Copied' : 'Copy'}
               </button>
             </div>
           </div>
           <div style={{ color: 'var(--text-muted)' }}>
-            Group Policy without the installer: set <em>ExtensionInstallForcelist</em> to the value shown above and the
-            extension policy <em>apiUrl</em> (see DEPLOYMENT.md). Uninstall from Settings &gt; Apps &gt; AgentShield.
+            Details and ready-made policy files: DEPLOYMENT.md. Remove AgentShield by taking it off the force-install list.
           </div>
         </div>
       )}
@@ -189,7 +179,7 @@ export const Deployment: React.FC<DeploymentProps> = ({ isAdmin, onChanged, onNa
       });
       setSettings(saved);
       setSettingsDraft(saved);
-      setSettingsMsg('Saved. Extensions pick this up on their next sync (within 5 minutes).');
+      setSettingsMsg('Saved. Connected extensions apply this within about a minute.');
       onChanged?.();
     } catch (err: any) {
       setSettingsMsg(err.message);

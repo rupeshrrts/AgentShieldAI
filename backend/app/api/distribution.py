@@ -89,8 +89,8 @@ def distribution_info(request: Request):
             "edge": f"https://microsoftedge.microsoft.com/addons/detail/{settings.EDGE_STORE_EXTENSION_ID}" if _ID.match(settings.EDGE_STORE_EXTENSION_ID) else None,
         },
         "downloads": {
-            "system_setup": Path(settings.SYSTEM_SETUP_PATH).is_file(),
             "extension_zip": (_package_dir() / "agentshield-extension.zip").is_file(),
+            "network_agent": Path(settings.AGENT_PACKAGE_PATH).is_file(),
         },
     }
 
@@ -113,17 +113,19 @@ def _check_download_link(t: Optional[str], file: str, db: Session) -> None:
         raise HTTPException(status_code=403, detail={"code": code, "message": message})
 
 
-@router.get("/download/AgentShield-System-Setup.exe")
-def download_system_setup(t: Optional[str] = Query(default=None), db: Session = Depends(get_db)):
-    """Windows installer that sets up AgentShield for every user in Chrome and Edge (run as administrator)."""
-    _check_download_link(t, "AgentShield-System-Setup.exe", db)
-    path = Path(settings.SYSTEM_SETUP_PATH)
+@router.get("/download/AgentShield-Agent.exe")
+def download_network_agent(t: Optional[str] = Query(default=None), db: Session = Depends(get_db)):
+    """The Network Agent installer: one self-installing exe that protects every browser and desktop AI
+    app on a PC with no extension and no Developer mode. Needs an active plan, like the other downloads."""
+    _check_download_link(t, "AgentShield-Agent.exe", db)
+    path = Path(settings.AGENT_PACKAGE_PATH)
     if not path.is_file():
         raise HTTPException(
             status_code=404,
-            detail="The installer has not been built on this server. See INSTALL.md, 'Build the installer'.",
+            detail="The Network Agent installer has not been built on this server. See agent/packaging (build the .spec).",
         )
-    return FileResponse(path, media_type="application/vnd.microsoft.portable-executable", filename="AgentShield-System-Setup.exe")
+    return FileResponse(path, media_type="application/vnd.microsoft.portable-executable",
+                        filename="AgentShield-Agent.exe", headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/download/agentshield-extension.zip")

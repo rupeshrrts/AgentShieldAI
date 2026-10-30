@@ -7,7 +7,7 @@ Populates initial baseline data when starting with a fresh database:
 - Standard domain traffic control rules (blocking file converters, allowing approved AI tools)
 """
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.core.catalog import RULE_CATALOG
@@ -28,11 +28,13 @@ from app.db.models import (
 from app.detection.detector import DetectorEngine
 
 
-def ensure_catalog_policies(db: Session, organization_id: str) -> int:
-    """Adds a policy for every catalog rule the organization does not have yet. Returns how many were added."""
-    existing = {
-        r[0] for r in db.query(Policy.rule_id).filter(Policy.organization_id == organization_id).all()
-    }
+def ensure_catalog_policies(db: Session, organization_id: str, existing: set | None = None) -> int:
+    """Adds a policy for every catalog rule the organization does not have yet. Returns how many were added.
+    `existing` (the organization's rule IDs) may be passed in to save a query."""
+    if existing is None:
+        existing = {
+            r[0] for r in db.query(Policy.rule_id).filter(Policy.organization_id == organization_id).all()
+        }
     added = 0
     for rule in RULE_CATALOG:
         if rule["rule_id"] in existing:
@@ -202,8 +204,12 @@ def init_db(db: Session):
 
     # Every organization has exactly one policy per catalog rule (new rules are added
     # with their recommended action). Admins enable/disable or change them; they are not deleted.
-    for org in db.query(Organization).all():
-        ensure_catalog_policies(db, org.id)
+    # One query for all organizations' rules (not one per organization: startup time must not grow with sign-ups)
+    rules_by_org: dict = {}
+    for org_id, rule_id in db.query(Policy.organization_id, Policy.rule_id).all():
+        rules_by_org.setdefault(org_id, set()).add(rule_id)
+    for (org_id,) in db.query(Organization.id).all():
+        ensure_catalog_policies(db, org_id, rules_by_org.get(org_id, set()))
 
     ensure_plans(db)
     db.flush()
@@ -274,11 +280,24 @@ def _align_schema(db: Session):
         ("organization_settings", "safe_search", "BOOLEAN"),
         ("organizations", "referral_code", "VARCHAR(16)"),
         ("organizations", "free_started_at", "TIMESTAMP WITH TIME ZONE"),
+        ("organizations", "policy_revision", "INTEGER DEFAULT 1 NOT NULL"),
         ("devices", "computer_id", "VARCHAR(36)"),
         ("activation_tokens", "computer_id", "VARCHAR(36)"),
     ]
 
+    # Read every table's columns at once (one query on PostgreSQL), then add only what is missing, so a
+    # restart (e.g. a free host waking up) does not pay one remote round trip per known column.
+    try:
+        tables = {t for t, _, _ in alterations}
+        existing_columns = {
+            key[1]: {c["name"] for c in cols}
+            for key, cols in inspect(db.get_bind()).get_multi_columns(filter_names=list(tables)).items()
+        }
+    except Exception:
+        existing_columns = {}
     for table_name, col_name, col_type in alterations:
+        if col_name in existing_columns.get(table_name, ()):
+            continue
         try:
             db.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"))
             db.commit()
@@ -307,7 +326,16 @@ def _align_schema(db: Session):
     if db.bind is not None and db.bind.dialect.name == "postgresql":
         from app.db.session import Base
 
+        try:
+            protected = {r[0] for r in db.execute(text(
+                "SELECT relname FROM pg_class WHERE relrowsecurity AND relnamespace = 'public'::regnamespace"
+            ))}
+        except Exception:
+            db.rollback()
+            protected = set()
         for table_name in Base.metadata.tables:
+            if table_name in protected:
+                continue
             try:
                 db.execute(text(f'ALTER TABLE "{table_name}" ENABLE ROW LEVEL SECURITY'))
                 db.commit()

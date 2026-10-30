@@ -90,26 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  el('pc-app-btn')?.addEventListener('click', () => {
-    const btn = el<HTMLButtonElement>('pc-app-btn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Connecting...';
-    }
-    chrome.runtime.sendMessage({ type: 'CONNECT_VIA_PC' }, (res) => {
-      if (btn) btn.disabled = false;
-      if (chrome.runtime.lastError) return;
-      if (res && res.ok) justActivated = true;
-      else if (res && res.pc_app === 'not_connected') {
-        setText('pc-app-text', 'Connect this PC in the AgentShield window that just opened. This browser then connects by itself.');
-        const t = el('pc-app-text');
-        if (t) t.dataset.sticky = '1';
-      }
-      else if (res && res.error) setText('conn-msg', res.error);
-      refreshStatus();
-    });
-  });
-
   el('retry-btn')?.addEventListener('click', () => {
     const btn = el<HTMLButtonElement>('retry-btn');
     if (btn) btn.disabled = true;
@@ -175,23 +155,6 @@ function refreshStatus() {
     }
 
     if (!authorized) {
-      // AgentShield Windows app: offered only when it is installed on this PC
-      const pcCard = el('pc-app-card');
-      const pcApp: string = res.pc_app || 'unknown';
-      if (pcCard) pcCard.style.display = pcApp === 'connected' || pcApp === 'not_connected' || pcApp === 'error' ? 'block' : 'none';
-      const pcBtn = el<HTMLButtonElement>('pc-app-btn');
-      if (pcBtn && !pcBtn.disabled) pcBtn.textContent = pcApp === 'not_connected' ? 'Connect this PC' : 'Connect this browser';
-      const pcText = el('pc-app-text');
-      if (pcText && !pcText.dataset.sticky) {
-        pcText.textContent =
-          res.pc_auto_connect_paused
-            ? 'This browser was signed out. Click to connect it again through the AgentShield app.'
-            : pcApp === 'not_connected'
-            ? 'The AgentShield app is installed but this PC is not connected yet. Connect it once and every browser on this PC connects by itself.'
-            : pcApp === 'error'
-            ? res.pc_app_message || 'The AgentShield app could not connect this browser.'
-            : 'This PC is connected in the AgentShield app. This browser connects by itself in a moment.';
-      }
       setText('conn-state', state.replace(/_/g, ' '));
       const dot = el('conn-dot');
       if (dot) dot.className = 'conn-dot' + (BUSY_STATES.has(state) ? ' busy' : '');

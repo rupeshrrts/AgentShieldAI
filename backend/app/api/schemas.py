@@ -75,6 +75,8 @@ class PolicyListResponse(BaseModel):
     organization_id: str
     organization_name: Optional[str] = None
     policy_version: int
+    # Blocking-configuration revision: browsers resync when it changes (see core/policy_revision.py)
+    policy_revision: int = 0
     last_synced_at: datetime
     policies: List[PolicyOut]
     # Confidential codewords managed from the dashboard; the extension replaces its defaults with these
@@ -339,6 +341,9 @@ class OrgSettingsOut(BaseModel):
     safe_search: bool = False
     # The blockable categories (id, name, description, default) for the dashboard
     web_category_catalog: List[Dict[str, Any]] = Field(default_factory=list)
+    # Headings the dashboard groups the category switches under, and the one-click presets (core/catalog.py)
+    web_category_groups: List[Dict[str, Any]] = Field(default_factory=list)
+    web_category_presets: List[Dict[str, Any]] = Field(default_factory=list)
     demo_mode: bool = False  # Set by the server's DEMO_MODE environment variable, not editable
     updated_by: Optional[str] = None
     updated_at: Optional[datetime] = None

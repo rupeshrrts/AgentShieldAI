@@ -1,0 +1,33 @@
+AgentShield Network Agent - pilot test on one PC
+=================================================
+
+This protects AI sites (ChatGPT, Claude, Gemini, ...) in EVERY browser on the PC - Chrome, Edge,
+Brave, Opera and Firefox - and in desktop AI apps. No browser extension. No Developer mode.
+It inspects ONLY the AI sites; all other browsing (banking, mail, ...) is untouched.
+
+WHAT IS IN THIS FOLDER
+  agentshield-agent.exe   the agent (proxy + connect tool)
+  Install-Agent.ps1       sets it up on this PC (admin)
+  Uninstall-Agent.ps1     removes everything (admin)
+
+TO TEST (about 2 minutes)
+  1. In the AgentShield portal: Connect browser -> Generate activation code -> copy the ASA1... code.
+  2. Right-click Windows Start -> "Terminal (Admin)" or "PowerShell (Admin)".
+  3. cd into this folder, then run (paste your code):
+
+        powershell -ExecutionPolicy Bypass -File .\Install-Agent.ps1 -Code ASA1.XXXXXXXX -Firefox
+
+  4. Close and reopen your browsers.
+  5. Open https://chat.openai.com and paste a FAKE secret, e.g.:
+        my key is sk-live-ABCDEFGH1234567890abcd
+     The request is blocked. Try a normal question - it goes through.
+  6. Check state:   .\agentshield-agent.exe status
+     Remove it:     powershell -ExecutionPolicy Bypass -File .\Uninstall-Agent.ps1
+
+NOTES
+  * Windows SmartScreen may warn because this exe is not code-signed yet. That is expected for a
+    pilot build; sign it with your certificate before wider rollout.
+  * On a personal PC a local administrator can turn the proxy off. To make it un-removable, push the
+    certificate and the AI-only proxy through Group Policy / Intune instead of this script
+    (see agent/README.md "Make it stick"). That is also how it covers every user on a shared PC.
+  * The agent needs an active plan (same as the extension). AI sites stay blocked until connected.

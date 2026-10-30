@@ -59,6 +59,9 @@ class Organization(Base):
     # When the account chose the Free plan (POST /api/v1/billing/free). Free forever is never automatic:
     # an account has no access until it chooses the Free plan, the trial, a paid plan or credits.
     free_started_at = Column(DateTime(timezone=True), nullable=True)
+    # Increased by every change that browsers enforce (rules, website controls, domain rules, keywords,
+    # settings). Browsers compare it once a minute and download the full sync only when it changed.
+    policy_revision = Column(Integer, nullable=False, default=1)
 
     # Relationships: Deleting an org cleanly cascades to its dependent records
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")

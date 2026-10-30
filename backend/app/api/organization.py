@@ -29,8 +29,16 @@ from app.api.schemas import (
     OrgSettingsUpdate,
 )
 from app.core.audit import record_admin_action
-from app.core.catalog import WEB_CATEGORIES, WEB_CATEGORY_IDS, effective_safe_search, effective_web_categories
+from app.core.catalog import (
+    WEB_CATEGORIES,
+    WEB_CATEGORY_GROUPS,
+    WEB_CATEGORY_IDS,
+    WEB_CATEGORY_PRESETS,
+    effective_safe_search,
+    effective_web_categories,
+)
 from app.core.config import settings as app_settings
+from app.core.policy_revision import bump_policy_revision
 from app.core.security import generate_device_key, hash_device_key
 from app.db.models import AdminAuditLog, DeviceKey, Organization, OrganizationSettings, RestrictedKeyword, User
 from app.db.session import get_db
@@ -82,6 +90,8 @@ def _settings_out(db: Session, organization_id: str) -> OrgSettingsOut:
         web_categories=categories,
         safe_search=safe_search,
         web_category_catalog=WEB_CATEGORIES,
+        web_category_groups=WEB_CATEGORY_GROUPS,
+        web_category_presets=WEB_CATEGORY_PRESETS,
         demo_mode=app_settings.DEMO_MODE,
         updated_by=row.updated_by,
         updated_at=row.updated_at,
@@ -206,6 +216,7 @@ def add_keyword(
         created_at=datetime.now(timezone.utc),
     )
     db.add(row)
+    bump_policy_revision(db, admin.organization_id)
     db.commit()
     db.refresh(row)
     record_admin_action(
@@ -231,6 +242,7 @@ def delete_keyword(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Keyword not found.")
     keyword = row.keyword
     db.delete(row)
+    bump_policy_revision(db, admin.organization_id)
     db.commit()
     record_admin_action(
         db, organization_id=admin.organization_id, actor=admin.email, action="keyword.delete",
@@ -286,6 +298,7 @@ def update_settings(
         if org:
             org.retention_days = payload.retention_days
 
+    bump_policy_revision(db, admin.organization_id)
     db.commit()
     result = _settings_out(db, admin.organization_id)
     after = result.model_dump(include=set(before.keys()))

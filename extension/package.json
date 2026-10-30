@@ -6,6 +6,8 @@
     "build": "node build.js",
     "watch": "node build.js --watch",
     "test": "node tests/run-tests.js && node tests/activation-roundtrip.js",
+    "test:e2e": "node tests/e2e/rules-e2e.js",
+    "store": "node ../scripts/packaging/store-packages.js",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

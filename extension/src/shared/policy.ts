@@ -1,12 +1,12 @@
 /**
  * Policy decision logic (pure functions, no DOM), shared by the content script and tests.
  *
- * IMPORTANT: mirrors backend/app/policies/evaluator.py:
+ * IMPORTANT: mirrors backend/app/policies/evaluator.py (checked by backend/tests/test_policy_twins.py):
  *   - Most restrictive action wins: BLOCK > REDACT > WARN > MONITOR > ALLOW
  *   - Severity breaks ties: CRITICAL > HIGH > MEDIUM > LOW
- *   - Rules without a configured policy use the category default
- *   - Disabled policies and policies scoped to other sites are ignored
- * Employee governance status can only make the result stricter.
+ *   - A rule is enforced only by an ENABLED policy that applies to the site. A disabled rule, and a
+ *     rule with no policy, is not enforced. Nothing falls back to a built-in default action.
+ *   - Employee governance status can only make the result stricter.
  */
 import { Finding, PolicyAction, PolicyEvaluationResult, PolicyRule, SeverityLevel } from './types';
 
@@ -25,12 +25,39 @@ export const SEVERITY_WEIGHT: Record<SeverityLevel, number> = {
   LOW: 1,
 };
 
-export const CATEGORY_DEFAULT_ACTION: Record<string, PolicyAction> = {
-  SECRET: 'BLOCK',
-  PII: 'WARN',
-  RESTRICTED: 'REDACT',
-  FILE: 'WARN',
-};
+/**
+ * Every rule the detectors can produce, in the same order as RULE_CATALOG in
+ * backend/app/core/catalog.py. The extension only enforces once the synced policies contain all of them.
+ */
+export const CATALOG_RULE_IDS: string[] = [
+  'secret.api_key_like',
+  'pii.email',
+  'pii.phone',
+  'pii.credit_card',
+  'pii.pan_india',
+  'pii.aadhaar',
+  'restricted.keyword',
+  'file.upload',
+  'secret.crypto_key',
+  'secret.connection_string',
+  'pii.iban',
+  'pii.bank_account',
+  'pii.upi',
+  'pii.passport',
+  'pii.voter_id',
+  'pii.gstin',
+  'restricted.internal_ip',
+];
+
+/**
+ * True only when the synced policies hold a row for every catalog rule. Before the first sync (or with an
+ * incomplete answer) the browser cannot know which rules are On, so it fails closed instead of guessing.
+ */
+export function policiesComplete(policies: PolicyRule[] | undefined | null): boolean {
+  if (!Array.isArray(policies)) return false;
+  const present = new Set(policies.map((p) => p.rule_id));
+  return CATALOG_RULE_IDS.every((id) => present.has(id));
+}
 
 /** Host matches a policy scope: '*' or empty = all sites; otherwise exact host or subdomain. */
 export function scopeMatches(scope: string | undefined, host: string): boolean {
@@ -40,26 +67,21 @@ export function scopeMatches(scope: string | undefined, host: string): boolean {
   return h === s || h.endsWith('.' + s);
 }
 
-/** Effective action/severity for one rule ID on this host, or null if the rule is disabled. */
+/**
+ * Action and severity of the enabled policy that enforces a rule on this host, or null when the rule is
+ * not enforced here (no enabled policy, or the policy is scoped to other sites).
+ */
 export function actionForRule(
   ruleId: string,
-  category: string,
-  defaultSeverity: SeverityLevel,
   policies: PolicyRule[],
   host: string
 ): { action: PolicyAction; severity: SeverityLevel } | null {
-  let disabled = false;
   for (const p of policies) {
-    if (p.rule_id !== ruleId) continue;
-    if (!p.enabled) {
-      disabled = true;
-      continue;
-    }
+    if (p.rule_id !== ruleId || !p.enabled) continue;
     if (!scopeMatches(p.site_scope, host)) continue;
     return { action: p.action, severity: p.severity };
   }
-  if (disabled) return null;
-  return { action: CATEGORY_DEFAULT_ACTION[category] || 'WARN', severity: defaultSeverity };
+  return null;
 }
 
 export function evaluateFindings(
@@ -83,7 +105,7 @@ export function evaluateFindings(
   // Pick the most restrictive action; ties go to higher severity, then the earliest finding
   let best: { action: PolicyAction; severity: SeverityLevel; rule: string } | null = null;
   for (const f of findings) {
-    const decision = actionForRule(f.rule_id, f.category, f.severity, policies, host);
+    const decision = actionForRule(f.rule_id, policies, host);
     if (!decision) continue;
     const { action, severity } = decision;
     if (
@@ -139,6 +161,15 @@ export const RULE_LABELS: Record<string, string> = {
   'pii.aadhaar': 'An Aadhaar number',
   'restricted.keyword': 'A confidential company term',
   'file.upload': 'A file upload',
+  'secret.crypto_key': 'A crypto wallet private key',
+  'secret.connection_string': 'A connection string with a password',
+  'pii.iban': 'An IBAN bank account number',
+  'pii.bank_account': 'Bank account details (IFSC or account number)',
+  'pii.upi': 'A UPI ID',
+  'pii.passport': 'A passport number',
+  'pii.voter_id': 'A voter ID number',
+  'pii.gstin': 'A GSTIN number',
+  'restricted.internal_ip': 'An internal IP address',
 };
 
 /** What the employee should do next, shown in alerts. */
@@ -151,4 +182,13 @@ export const RULE_ADVICE: Record<string, string> = {
   'pii.aadhaar': 'Never paste Aadhaar numbers into AI tools. Remove it before sending.',
   'restricted.keyword': 'Use a generic description instead of internal project names.',
   'file.upload': 'Check the file contains no customer, financial or confidential data.',
+  'secret.crypto_key': 'Never share wallet keys. If it was shared anywhere, move the funds to a new wallet.',
+  'secret.connection_string': 'Remove the password from the URL (use user:****@host). If it was shared, change the password.',
+  'pii.iban': 'Remove the account number or replace it with a placeholder.',
+  'pii.bank_account': 'Remove the IFSC code and account number before sending.',
+  'pii.upi': 'Remove the UPI ID or replace it with a placeholder.',
+  'pii.passport': 'Never paste passport numbers into AI tools. Remove it before sending.',
+  'pii.voter_id': 'Remove the voter ID number before sending.',
+  'pii.gstin': 'Check that sharing this business identifier is allowed.',
+  'restricted.internal_ip': 'Replace internal addresses with placeholders such as <server-ip>.',
 };

@@ -41,12 +41,16 @@ A **prompt check** is one prompt that AgentShield inspected on an AI site in you
 
 ## 3. Install
 
-**On Windows (easiest, every browser at once):** in the portal open **Download** and click **Download for Windows (.exe)**. Run `AgentShield-System-Setup.exe` and click **Yes** when Windows asks. It adds AgentShield to Chrome, Edge and Brave and installs the AgentShield app. At the end, leave **Connect this PC to my AgentShield account now** ticked and click **Finish**, then:
+**On Windows (easiest, every browser at once):** in the portal open **Download** and click **Download for Windows (.exe)**. Then:
 
-1. In the portal open **Connect browser** and click **Connect this PC**. Your browser asks to open AgentShield: click **Open**, check the server shown and click **Connect**. (Or click **Generate activation code** and paste the code into the **Connect AgentShield** window.)
-2. Done: every browser on this PC connects by itself within a minute, including browsers you install later. Restart the browsers if the AgentShield icon is not there yet. Skip step 4.
+1. In the portal open **Connect browser** and click **Generate activation code**. Copy the code (starts with `ASA1.`, works once, for 30 minutes).
+2. Run `AgentShield-System-Setup.exe`, click **Yes** when Windows asks, and paste the code when setup asks for it. Setup installs the AgentShield app and connects this PC to your account. (No code yet? Leave it empty and connect later from **Connect AgentShield** in the Start menu, or with **Connect this PC** in the portal.)
+3. Click **Finish**.
+   * **Personal PC** (not joined to a company domain, Entra ID or Intune): Chrome and Edge do not let a setup add an extension by itself, so the extensions page of each browser opens. Turn on **Developer mode**, click **Load unpacked**, press **Ctrl+V** (setup copied the folder `C:\Program Files\AgentShield\extension`) and select it. Do this once per browser.
+   * **Company-managed PC:** AgentShield appears in Chrome, Edge and Brave by itself (restart them if the icon is not there yet).
+4. Done: AgentShield connects by itself in every browser, without pasting a code into the browser. Skip step 4 below.
 
-Your PC uses **one device** of your plan, however many browsers it has. The browsers show "Managed by your organization": that is how AgentShield is installed, so it cannot be switched off by accident. To stop, remove the PC in **Connect browser → Remove PC** or uninstall AgentShield in Windows **Settings → Apps**. Other Windows users of the same PC connect their own account from **Connect AgentShield** in the Start menu.
+Your PC uses **one device** of your plan, however many browsers it has. The browsers may show "Managed by your organization" because setup writes AgentShield's settings as browser policy. To update a copy added with **Load unpacked**, run the newest setup again and click reload on the extensions page. To stop, remove the PC in **Connect browser → Remove PC** or uninstall AgentShield in Windows **Settings → Apps**. Other Windows users of the same PC connect their own account from **Connect AgentShield** in the Start menu.
 
 **If you received a store link:** open it in Chrome and click **Add to Chrome** (in Edge click **Get**), confirm, then go to step 4.
 

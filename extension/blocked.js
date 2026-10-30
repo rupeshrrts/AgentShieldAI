@@ -13,6 +13,23 @@ document.addEventListener('DOMContentLoaded', () => {
     social: ['Social network blocked', 'Social networks are blocked on this browser.'],
     bypass: ['Filter bypass blocked', 'VPN, proxy and similar services that get around website blocking are not allowed on this browser.'],
     streaming: ['Movies & music site blocked', 'Film, video and music streaming or download sites are blocked on this browser.'],
+    cryptomining: ['Cryptomining site blocked', 'This site uses computers to mine cryptocurrency in the background, which slows them down and can hide malware.'],
+    spyware: ['Spyware site blocked', 'This site belongs to phone or computer spying software (stalkerware).'],
+    hacking: ['Hacking site blocked', 'Hacking tools, password cracks and stolen-account sites are blocked on this browser.'],
+    remote_access: ['Remote-access site blocked', 'Remote desktop and remote support sites are blocked. Scammers use them to take over computers.'],
+    dyndns: ['Dynamic DNS site blocked', 'Free dynamic-DNS addresses are blocked because malware and phishing often use them.'],
+    shortener: ['Short link blocked', 'Short-link services hide where a link really goes, so they are blocked on this browser.'],
+    filesharing: ['File-sharing site blocked', 'Public file-sharing and online-storage sites are blocked so company files do not leave the organization.'],
+    webmail: ['Personal webmail blocked', 'Personal and throw-away email sites are blocked so company data is not sent outside.'],
+    mature: ['Mature content blocked', 'Suggestive and mature sites are blocked on this browser.'],
+    dating: ['Dating site blocked', 'Dating and matchmaking sites are blocked on this browser.'],
+    drugs: ['Drug site blocked', 'Sites that sell or promote illegal drugs are blocked on this browser.'],
+    hate: ['Hate & violence site blocked', 'Hate speech, extremist and violent sites are blocked on this browser.'],
+    weapons: ['Weapons site blocked', 'Weapon shops and sites about making dangerous materials are blocked on this browser.'],
+    chat: ['Chat room blocked', 'Open and anonymous chat rooms, where children can meet strangers, are blocked on this browser.'],
+    games: ['Game site blocked', 'Online games are blocked on this browser.'],
+    shopping: ['Shopping site blocked', 'Online shops are blocked on this browser.'],
+    jobsearch: ['Job site blocked', 'Job boards and recruitment sites are blocked on this browser.'],
   };
   const category = Object.prototype.hasOwnProperty.call(CATEGORIES, params.get('category')) ? params.get('category') : '';
 
@@ -76,6 +93,34 @@ document.addEventListener('DOMContentLoaded', () => {
       whyEl.innerText =
         'Sites such as public file converters and paste sites copy what you upload to outside servers, which can leak confidential data. ' +
         'Please use a company-approved tool. If you need this site for work, ask IT to review it.';
+    }
+  }
+
+  // Where this block is switched Off or On (every block except the activation lock is a dashboard switch)
+  const CATEGORY_SWITCHES = {
+    malware: 'Malware, phishing & scams', adult: 'Adult content', piracy: 'Piracy', gambling: 'Gambling',
+    social: 'Social networks', bypass: 'Filter bypass', streaming: 'Movies, music & streaming',
+    cryptomining: 'Cryptomining', spyware: 'Spyware & stalkerware', hacking: 'Hacking & password cracking',
+    remote_access: 'Remote-access tools', dyndns: 'Dynamic DNS', shortener: 'URL shorteners',
+    filesharing: 'File sharing & online storage', webmail: 'Personal webmail', mature: 'Mature & suggestive',
+    dating: 'Dating', drugs: 'Drugs', hate: 'Hate & violence', weapons: 'Weapons', chat: 'Chat rooms',
+    games: 'Online games', shopping: 'Shopping', jobsearch: 'Job search',
+  };
+  const APPLY = ' Changes reach this browser within about a minute (or at once with "Sync policies" in the AgentShield popup).';
+  const controlEl = document.getElementById('control-where');
+  if (controlEl) {
+    if (reason === 'activation_required') {
+      document.querySelector('#control-box .why-title').innerText = 'How to unblock';
+      controlEl.innerText = 'This is not a dashboard rule: AI tools open as soon as this browser is connected with an activation code.';
+    } else if (reason === 'category') {
+      controlEl.innerText = 'Yes. An administrator can switch the "' + (CATEGORY_SWITCHES[category] || 'website category') +
+        '" category Off or On in the AgentShield portal: Website controls > Category blocking. To open only this site, add it there as ALLOW.' + APPLY;
+    } else if (reason === 'unapproved_ai') {
+      controlEl.innerText = 'Yes. An administrator can switch "Block unapproved AI tools" Off or On in the AgentShield portal (Website controls), ' +
+        'or add ' + (domain || 'this site') + ' to the Allowed list there.' + APPLY;
+    } else {
+      controlEl.innerText = 'Yes. This is a website rule. An administrator can switch it in the AgentShield portal: Website controls > Blocked Traffic > ' +
+        (domain || 'this site') + ' > Enabled / Disabled (or delete the rule).' + APPLY;
     }
   }
 

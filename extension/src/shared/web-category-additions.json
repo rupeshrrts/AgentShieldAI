@@ -28,6 +28,57 @@
       "reddit.com", "redd.it", "redditmedia.com", "redditstatic.com"
     ]
   },
+  "spyware": {
+    "domains": ["mspy.com", "flexispy.com", "eyezy.com", "spyic.com", "cocospy.com", "hoverwatch.com", "umobix.com", "xnspy.com"]
+  },
+  "remote_access": {
+    "domains": ["ultraviewer.net", "rustdesk.com", "splashtop.com", "getscreen.me", "remotepc.com", "supremocontrol.com", "aeroadmin.com"]
+  },
+  "dyndns": {
+    "domains": ["no-ip.com", "noip.com", "dynu.com", "freedns.afraid.org"]
+  },
+  "shortener": {
+    "exclude_domains": ["lnkd.in"]
+  },
+  "filesharing": {
+    "domains": [
+      "mega.nz", "mega.io", "gofile.io", "pixeldrain.com", "file.io", "filetransfer.io", "terabox.com", "1024terabox.com",
+      "sendgb.com", "smash.com", "transfernow.net", "swisstransfer.com", "uploadnow.io", "catbox.moe"
+    ]
+  },
+  "webmail": {
+    "domains": [
+      "proton.me", "tutanota.com", "tuta.com", "temp-mail.org", "guerrillamail.com", "mailinator.com", "rediffmail.com",
+      "mail.rediff.com", "gmx.com", "gmx.net", "mail.com", "yopmail.com", "emailondeck.com"
+    ]
+  },
+  "dating": {
+    "domains": [
+      "aisle.com", "trulymadly.com", "hinge.co", "happn.com", "jeevansathi.com", "bharatmatrimony.com", "quackquack.in",
+      "boo.world", "feeld.co", "grindr.com", "badoo.com"
+    ]
+  },
+  "chat": {
+    "domains": ["emeraldchat.com", "chathub.cam", "ome.tv", "chitchat.gg", "omegleweb.com", "monkey.app", "azarlive.com"]
+  },
+  "games": {
+    "domains": [
+      "epicgames.com", "mpl.live", "ludoking.com", "friv.com", "y8.com", "kongregate.com", "armorgames.com", "itch.io",
+      "battlegroundsmobileindia.com", "freefire.garena.com", "zupee.com", "gamezop.com"
+    ]
+  },
+  "shopping": {
+    "domains": [
+      "flipkart.com", "myntra.com", "meesho.com", "ajio.com", "nykaa.com", "snapdeal.com", "tatacliq.com", "jiomart.com",
+      "shopclues.com", "temu.com", "shein.com", "bigbasket.com", "firstcry.com", "lenskart.com", "croma.com", "purplle.com"
+    ]
+  },
+  "jobsearch": {
+    "domains": [
+      "naukri.com", "glassdoor.com", "glassdoor.co.in", "foundit.in", "shine.com", "timesjobs.com", "apna.co",
+      "internshala.com", "instahyre.com", "hirist.tech", "cutshort.io", "workindia.in", "iimjobs.com", "wellfound.com"
+    ]
+  },
   "streaming": {
     "domains": [
       "netflix.com", "primevideo.com", "hotstar.com", "jiohotstar.com", "jiocinema.com", "zee5.com", "sonyliv.com",

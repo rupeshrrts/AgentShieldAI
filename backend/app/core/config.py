@@ -72,10 +72,10 @@ class Settings:
         "EXTENSION_PACKAGE_DIR",
         str(Path(__file__).resolve().parent.parent.parent.parent / "dist-installer" / "package"),
     )
-    # Windows system installer offered for download in the dashboard (built with Inno Setup)
-    SYSTEM_SETUP_PATH: str = os.getenv(
-        "SYSTEM_SETUP_PATH",
-        str(Path(__file__).resolve().parent.parent.parent.parent / "dist-installer" / "AgentShield-System-Setup.exe"),
+    # Network Agent installer (one self-installing exe) offered for download; built by agent/packaging
+    AGENT_PACKAGE_PATH: str = os.getenv(
+        "AGENT_PACKAGE_PATH",
+        str(Path(__file__).resolve().parent.parent.parent.parent / "dist-installer" / "AgentShield-Agent.exe"),
     )
     # Public base URL browsers use to reach this server (e.g. https://agentshield.company.com).
     # If empty, it is taken from the incoming request.

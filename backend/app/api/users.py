@@ -279,18 +279,18 @@ def revoke_device(device_id: str, request: Request, admin: User = Depends(get_cu
 
 # --- Any signed-in account: own activation codes and devices ---
 
-DOWNLOAD_FILES = ("agentshield-extension.zip", "AgentShield-System-Setup.exe")
+DOWNLOAD_FILES = ("agentshield-extension.zip", "AgentShield-Agent.exe")
 DOWNLOAD_LINK_MINUTES = 5
 
 
 class DownloadLinkRequest(BaseModel):
-    file: Literal["agentshield-extension.zip", "AgentShield-System-Setup.exe"]
+    file: Literal["agentshield-extension.zip", "AgentShield-Agent.exe"]
 
 
 @me_router.post("/download-link")
 def create_download_link(body: DownloadLinkRequest, request: Request, user: User = Depends(get_signed_in_user),
                          db: Session = Depends(get_db)):
-    """A short-lived link to download the extension (or the IT installer). Only accounts that may connect a
+    """A short-lived link to download the extension (or the optional Network Agent). Only accounts that may connect a
     browser get one: an active trial, plan, credits or the Free plan (the same rule as activation codes)."""
     ratelimit.hit("download-link", user.id, 30, 60 * 60, "Too many downloads in the last hour. Try again later.")
     ent = current_entitlement(db, user.organization_id)

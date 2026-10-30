@@ -76,6 +76,55 @@ def verhoeff_valid(digits: str) -> bool:
     return c == 0
 
 
+_BASE36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def gstin_valid(gstin: str) -> bool:
+    """GSTIN check character (the GST Network's mod-36 algorithm over the first 14 characters)."""
+    if len(gstin) != 15:
+        return False
+    total = 0
+    for i in range(14):
+        v = _BASE36.find(gstin[i])
+        if v < 0:
+            return False
+        p = v * (1 if i % 2 == 0 else 2)
+        total += p // 36 + p % 36
+    return _BASE36[(36 - total % 36) % 36] == gstin[14]
+
+
+def iban_valid(iban: str) -> bool:
+    """IBAN mod-97 check (ISO 13616); spaces are ignored."""
+    s = iban.replace(" ", "").upper()
+    if not 15 <= len(s) <= 34:
+        return False
+    mod = 0
+    for ch in s[4:] + s[:4]:
+        v = _BASE36.find(ch)
+        if v < 0:
+            return False
+        for d in str(v):
+            mod = (mod * 10 + int(d)) % 97
+    return mod == 1
+
+
+# Common UPI handles (the part after @). Only these count, so ordinary @mentions are not UPI IDs.
+UPI_HANDLES = [
+    "ybl", "ibl", "axl", "okaxis", "okhdfcbank", "okicici", "oksbi", "paytm", "ptyes", "ptaxis", "pthdfc", "ptsbi",
+    "apl", "yapl", "upi", "icici", "sbi", "hdfcbank", "axisbank", "kotak", "idfcbank", "idfcfirst", "indus", "federal",
+    "pnb", "boi", "unionbank", "barodampay", "aubank", "airtel", "freecharge", "jupiteraxis", "fbl", "waicici",
+    "wahdfcbank", "wasbi", "waaxis", "abfspay", "ikwik", "mbk", "slice", "naviaxis", "yesbank", "rbl", "dbs", "kbl",
+    "cnrb", "equitas", "jio", "superyes", "amazonpay", "postbank",
+]
+
+# A password part that is only a placeholder (connection-string examples are not secrets)
+_PLACEHOLDER = re.compile(r"^(?:\*+|x+|<[^>]*>|\$\{[^}]*\}|\{[^}]*\}|password|pass|pwd|secret|changeme)$", re.IGNORECASE)
+
+
+def _overlaps(spans, start: int, end: int) -> bool:
+    return any(start < e and end > s for s, e in spans)
+
+
 class DetectorEngine:
     """Regex, checksum and keyword detection engine for credentials, PII, and trade secrets."""
 
@@ -116,6 +165,47 @@ class DetectorEngine:
     # Indian PAN: 5 letters (4th = holder type), 4 digits, 1 letter
     PAN_PATTERN: re.Pattern = re.compile(r"\b[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]\b")
 
+    # --- 2.6 data rules. Patterns that need a nearby word put the value in group 1 at the END of the match.
+
+    # Connection strings with a password: scheme://user:password@host (group 1 = password)
+    CONNECTION_PATTERN: re.Pattern = re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]{1,20}://[^\s:/@'\"]+:([^\s@/'\"]{3,})@[^\s/'\"]+")
+
+    # Crypto wallet private keys: Bitcoin WIF (uncompressed / compressed), BIP32 xprv, 64-hex key next to a key word
+    CRYPTO_PATTERNS: List[re.Pattern] = [
+        re.compile(r"\b5[HJK][1-9A-HJ-NP-Za-km-z]{49}\b"),
+        re.compile(r"\b[KL][1-9A-HJ-NP-Za-km-z]{51}\b"),
+        re.compile(r"\bxprv[1-9A-HJ-NP-Za-km-z]{107,108}\b"),
+        re.compile(r"\b(?:private[\s_-]?key|priv[\s_-]?key|wallet[\s_-]?key|seed)\b[^\n]{0,20}?\b(?:0x)?([a-fA-F0-9]{64})\b", re.IGNORECASE),
+    ]
+
+    # IBAN: country code, 2 check digits, 11-30 letters/digits (optionally in groups), mod-97 checked
+    IBAN_PATTERN: re.Pattern = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}\b")
+
+    # UPI ID: name@handle with a known UPI handle, not followed by a domain ending (that would be an email)
+    UPI_PATTERN: re.Pattern = re.compile(
+        r"\b[A-Za-z0-9][A-Za-z0-9._-]{1,255}@(?:" + "|".join(UPI_HANDLES) + r")(?!\.?[A-Za-z0-9-])", re.IGNORECASE
+    )
+
+    # GSTIN: state code, PAN, entity number, Z, check character (checked)
+    GSTIN_PATTERN: re.Pattern = re.compile(r"\b(?:0[1-9]|[12]\d|3[0-8]|97|99)[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b")
+
+    # Indian passport number, only when the word "passport" comes shortly before it (group 1)
+    PASSPORT_PATTERN: re.Pattern = re.compile(r"\bpassport\b[^\n]{0,40}?\b([A-PR-WY][1-9]\d{6})\b", re.IGNORECASE)
+
+    # Voter ID (EPIC): 3 letters + 7 digits, only with "voter", "EPIC" or "election" shortly before it (group 1)
+    VOTER_PATTERN: re.Pattern = re.compile(r"\b(?:voter|epic|election)\b[^\n]{0,40}?\b([A-Z]{3}\d{7})\b", re.IGNORECASE)
+
+    # Indian bank details: IFSC code, or a 9-18 digit account number after "account" / "a/c" / "acct" (group 1)
+    IFSC_PATTERN: re.Pattern = re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b")
+    ACCOUNT_PATTERN: re.Pattern = re.compile(
+        r"\b(?:a/c|acct|account)(?:\s*(?:no|number|num)\.?)?(?:\s*is)?\s*[:#-]?\s*(\d{9,18})\b", re.IGNORECASE
+    )
+
+    # Internal (private) IPv4 addresses: 10.x, 172.16-31.x, 192.168.x (not part of a longer dotted number)
+    PRIVATE_IP_PATTERN: re.Pattern = re.compile(
+        r"\b(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})\b(?!\.\d)"
+    )
+
     # Baseline keywords used until an organization manages its own list in the dashboard
     DEFAULT_RESTRICTED_KEYWORDS = [
         "PROJECT-ALPHA-CONFIDENTIAL",
@@ -144,19 +234,52 @@ class DetectorEngine:
 
         findings: List[Finding] = []
 
+        def add_group(rule_id: str, category: str, severity: str, match: re.Match) -> tuple:
+            # Value in group 1 at the end of the match (the words before it are only context)
+            end = match.end()
+            start = end - len(match.group(1))
+            findings.append(Finding(rule_id, category, severity, start, end, match.group(1)))
+            return (start, end)
+
         # 1. API keys, tokens, private keys and password definitions
         for pattern in self.API_KEY_PATTERNS:
             for match in pattern.finditer(text):
                 findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
 
-        # 2. Email addresses
+        # 1b. Connection strings with a real password, and crypto wallet private keys
+        connection_spans = []
+        for match in self.CONNECTION_PATTERN.finditer(text):
+            if _PLACEHOLDER.match(match.group(1)):
+                continue
+            findings.append(Finding("secret.connection_string", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
+            connection_spans.append((match.start(), match.end()))
+        for pattern in self.CRYPTO_PATTERNS:
+            for match in pattern.finditer(text):
+                if pattern.groups:
+                    add_group("secret.crypto_key", "SECRET", "HIGH", match)
+                else:
+                    findings.append(Finding("secret.crypto_key", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
+
+        # 2. Email addresses (not the user:password@host part of a connection string)
         for match in self.EMAIL_PATTERN.finditer(text):
+            if _overlaps(connection_spans, match.start(), match.end()):
+                continue
             findings.append(Finding("pii.email", "PII", "MEDIUM", match.start(), match.end(), match.group(0)))
 
+        # 2b. IBAN (checked), before cards so its digits are not read as a card or Aadhaar number
+        iban_spans = []
+        for match in self.IBAN_PATTERN.finditer(text):
+            if not iban_valid(match.group(0)):
+                continue
+            findings.append(Finding("pii.iban", "PII", "HIGH", match.start(), match.end(), match.group(0)))
+            iban_spans.append((match.start(), match.end()))
+
         # 3. Payment card numbers
-        number_spans = []
+        number_spans = list(iban_spans)
         for match in self.CARD_PATTERN.finditer(text):
             digits = re.sub(r"\D", "", match.group(0))
+            if _overlaps(iban_spans, match.start(), match.end()):
+                continue
             if 13 <= len(digits) <= 19 and len(set(digits)) > 1 and luhn_valid(digits):
                 findings.append(Finding("pii.credit_card", "PII", "HIGH", match.start(), match.end(), match.group(0)))
                 number_spans.append((match.start(), match.end()))
@@ -164,9 +287,30 @@ class DetectorEngine:
         # 4. Aadhaar numbers
         for match in self.AADHAAR_PATTERN.finditer(text):
             digits = re.sub(r"\D", "", match.group(0))
+            if _overlaps(iban_spans, match.start(), match.end()):
+                continue
             if len(digits) == 12 and verhoeff_valid(digits):
                 findings.append(Finding("pii.aadhaar", "PII", "HIGH", match.start(), match.end(), match.group(0)))
                 number_spans.append((match.start(), match.end()))
+
+        # 4b. UPI IDs, GSTIN, passport and voter ID numbers, bank details, internal IP addresses
+        for match in self.UPI_PATTERN.finditer(text):
+            findings.append(Finding("pii.upi", "PII", "MEDIUM", match.start(), match.end(), match.group(0)))
+            number_spans.append((match.start(), match.end()))
+        for match in self.GSTIN_PATTERN.finditer(text):
+            if gstin_valid(match.group(0)):
+                findings.append(Finding("pii.gstin", "PII", "LOW", match.start(), match.end(), match.group(0)))
+        for match in self.PASSPORT_PATTERN.finditer(text):
+            add_group("pii.passport", "PII", "HIGH", match)
+        for match in self.VOTER_PATTERN.finditer(text):
+            add_group("pii.voter_id", "PII", "MEDIUM", match)
+        for match in self.IFSC_PATTERN.finditer(text):
+            findings.append(Finding("pii.bank_account", "PII", "HIGH", match.start(), match.end(), match.group(0)))
+        for match in self.ACCOUNT_PATTERN.finditer(text):
+            number_spans.append(add_group("pii.bank_account", "PII", "HIGH", match))
+        for match in self.PRIVATE_IP_PATTERN.finditer(text):
+            if all(int(o) <= 255 for o in match.group(0).split(".")):
+                findings.append(Finding("restricted.internal_ip", "RESTRICTED", "LOW", match.start(), match.end(), match.group(0)))
 
         # 5. PAN numbers
         for match in self.PAN_PATTERN.finditer(text):

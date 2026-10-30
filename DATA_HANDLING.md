@@ -1,6 +1,6 @@
 # AgentShield — Data Handling
 
-Answers to the standard data-protection questions, verified against the code at version 2.1.0 ("SaaS phase 1": self-serve companies, trials and licences; "SaaS phase 2": Razorpay payments; 1.5.1: sign-up without email confirmation; 2.0.0: separate internal admin console for AgentShieldAI staff, with staff roles and mandatory MFA; 2.1.0: Individual accounts, email confirmation before the trial, usage metering, prepaid credits, personal API tokens). Items that depend on how you deploy (and therefore cannot be verified from the code) are marked **[deployment]**.
+Answers to the standard data-protection questions, verified against the code at version 2.1.0 ("SaaS phase 1": self-serve companies, trials and licences; "SaaS phase 2": Razorpay payments; 1.5.1: sign-up without email confirmation; 2.0.0: separate internal admin console for AgentShieldAI staff, with staff roles and mandatory MFA; 2.1.0: Individual accounts, email confirmation before the trial, usage metering, prepaid credits, personal API tokens; 2.5.0: optional Network Agent, a local proxy that decrypts only the AI domains and reuses the shared detector/evaluator — see §2). Items that depend on how you deploy (and therefore cannot be verified from the code) are marked **[deployment]**.
 
 ## 1. What data is collected from browser activity?
 
@@ -25,15 +25,17 @@ Browsing history is **not** collected. Prompt checks run only on the supported A
 
 All prompt text and text-file content is inspected inside the browser by `extension/src/content/detector.ts` and decided by `extension/src/shared/policy.ts`. No content is sent anywhere to make a decision.
 
+**With the Network Agent (2.5):** on a PC running the optional Network Agent (`agent/`), inspection happens locally in the agent process instead of the page. The agent decrypts **only the AI domains** listed in `agent/agentshield_agent/config.py`; all other HTTPS (banking, health, mail, everything else) is tunnelled without being decrypted or read. For an AI request it extracts the prompt text and runs the **same** detector and policy evaluator as the backend (`backend/app/detection/detector.py`, `backend/app/policies/evaluator.py`), so no prompt content is sent anywhere to make a decision. What then leaves the PC is only the event described in §5 (prompt text masked by the same rules, and only if the account stores it); a redacted prompt is rewritten in the request before it reaches the AI site. File uploads and binary bodies are not read.
+
 ## 3. What is stored, and where?
 
 **In the browser:**
 * `chrome.storage.local` (inside the Chrome profile on disk, not encrypted by AgentShield): a non-secret activation record (server address, device ID, account email, organization name), rules, keywords, settings, website lists, a random install ID, last known employee status, and a queue of up to 500 unsent events (masked as in §5). No password, activation code or device key is stored.
 * IndexedDB: the browser's ECDSA P-256 key pair, created with WebCrypto as **non-extractable** (the private key cannot be read out or copied by scripts, other extensions or a copy of the storage).
 * Memory and `chrome.storage.session` only: the current 15-minute session token and the server's licence verdict that came with it (plan, state, end date; shown in the popup), cleared when the browser closes. Access never depends on licence flags stored in the browser: only a fresh server session grants it.
-* `chrome.storage.local` also holds `pcAutoConnectPaused` (1.8.0): true after "Sign out this browser", so the browser does not reconnect through the Windows app on its own. It can only stop automatic connection, never grant access.
+* Extension 1.9.0 (2.6) talks to no program on the computer (no native messaging) and stores nothing new. Besides the rule sync it asks the server once a minute for one number, the organization's rule revision (`GET /api/v1/policies/revision`); that request carries only the device session and sends no browsing or prompt data. The `pcAutoConnectPaused` flag of extension 1.8.0 is no longer used.
 
-**On a Windows PC with the AgentShield Windows app (2.4):**
+**On a Windows PC where the older AgentShield Windows app (2.4) was installed** (the extension no longer uses it since 1.9.0):
 * `%LOCALAPPDATA%\AgentShield\pc-connection.json` (per Windows user): server address, PC ID, account email, account name, the key's name and the connection time. No password, activation code or token.
 * The PC's ECDSA P-256 key in that Windows user's CNG key store (Microsoft Software Key Storage Provider), created with export disabled. Only its public key is sent to the server.
 * `%LOCALAPPDATA%\AgentShield\app.log`: connection events and errors (no codes or tokens), at most 256 KB.
@@ -91,13 +93,13 @@ No plaintext invite token (customer or staff), confirmation-link token, password
 
 | Event | Text sent | Default |
 | :--- | :--- | :--- |
-| Prompt that broke a rule (BLOCK / WARN / REDACT / MONITOR) | Prompt with **credentials, card and Aadhaar numbers masked**. Emails, phone numbers, PAN and keywords are **not** masked in this text. For REDACT, the redacted text that was actually sent. | **On** ("Store text of prompts that broke a rule") |
+| Prompt that broke a rule (BLOCK / WARN / REDACT / MONITOR) | Prompt with **credentials, connection-string passwords, crypto wallet keys, card, Aadhaar, IBAN, bank account, passport and voter ID numbers masked** (2.6 adds the last six). Emails, phone numbers, PAN, UPI IDs, GSTIN, internal IP addresses and keywords are **not** masked in this text. For REDACT, the redacted text that was actually sent. | **On** ("Store text of prompts that broke a rule") |
 | Allowed prompt | Prompt with credentials/card/Aadhaar masked | **Off** (counted only) |
 | File upload event | File names and sizes; never file content | Follows the first setting |
 | Blocked website (own BLOCK list, unapproved AI tool) | Hostname | Always |
 | Website blocked by category | Category only (no hostname) | Always |
 
-When a setting is off, the extension omits the text and the server discards any text it receives anyway (`backend/app/core/privacy.py: prepare_prompt_for_storage`). The server re-masks credentials, card and Aadhaar numbers before storing, whatever the client sends.
+When a setting is off, the extension omits the text and the server discards any text it receives anyway (`backend/app/core/privacy.py: prepare_prompt_for_storage`). The server re-masks the same items (credentials, connection strings, wallet keys, card, Aadhaar, IBAN, bank account, passport and voter ID numbers) before storing, whatever the client sends. Text pasted into an AI prompt box (2.6) is checked locally like a prompt; only a paste that a Block rule stops is reported, as a masked event like a blocked prompt.
 
 ## 6. Where are logs and security events stored?
 

@@ -99,15 +99,28 @@ test('disabled policy is ignored', () => {
   const pol = policies.map((p) => (p.rule_id === 'secret.api_key_like' ? { ...p, enabled: false } : p));
   assert.strictEqual(evaluate('sk-demo-EXAMPLE123456789', pol).action, 'ALLOW');
 });
-test('rule without a policy uses the category default', () => {
-  assert.strictEqual(evaluate('Card 4111 1111 1111 1111', []).action, 'WARN'); // PII default
-  assert.strictEqual(evaluate('sk-demo-EXAMPLE123456789', []).action, 'BLOCK'); // SECRET default
+test('rule without an enabled policy is not enforced (no built-in default)', () => {
+  assert.strictEqual(evaluate('Card 4111 1111 1111 1111', []).action, 'ALLOW');
+  assert.strictEqual(evaluate('sk-demo-EXAMPLE123456789', []).action, 'ALLOW');
+  assert.strictEqual(evaluate('sk-demo-EXAMPLE123456789', [{ ...policies[0], enabled: false }]).action, 'ALLOW');
+});
+test('disabling every rule lets every detected item through', () => {
+  const off = policies.map((p) => ({ ...p, enabled: false }));
+  assert.strictEqual(evaluate('sk-demo-EXAMPLE123456789 demo.user@example.com PROJECT-ALPHA-CONFIDENTIAL (555) 234-5678', off).action, 'ALLOW');
 });
 test('site scope matches exact host and subdomains only', () => {
   const pol = [{ ...policies[1], site_scope: 'claude.ai' }];
   assert.strictEqual(evaluate('demo.user@example.com', pol, 'claude.ai').action, 'WARN');
-  // Scoped to another site: policy does not apply, category default (WARN) applies
-  assert.strictEqual(evaluate('demo.user@example.com', [{ ...policies[1], action: 'BLOCK', site_scope: 'claude.ai' }], 'notclaude.ai').action, 'WARN');
+  assert.strictEqual(evaluate('demo.user@example.com', pol, 'app.claude.ai').action, 'WARN');
+  // Scoped to another site: the policy does not apply here, so nothing is enforced here
+  assert.strictEqual(evaluate('demo.user@example.com', [{ ...policies[1], action: 'BLOCK', site_scope: 'claude.ai' }], 'notclaude.ai').action, 'ALLOW');
+});
+test('an enabled row wins over a disabled row for the same rule', () => {
+  const pol = [
+    { ...policies[0], enabled: false, action: 'ALLOW' },
+    { ...policies[0], id: '9', enabled: true, action: 'WARN' },
+  ];
+  assert.strictEqual(evaluate('sk-demo-EXAMPLE123456789', pol).action, 'WARN');
 });
 test('SUSPENDED blocks everything', () => {
   const r = evaluate('Explain TCP', policies, 'chatgpt.com', 'SUSPENDED');
@@ -278,11 +291,21 @@ const generator = require('../scripts/update-web-categories.js');
 const webConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'shared', 'web-categories.json'), 'utf8'));
 const sortIds = (r) => ({ enable: [...r.enable].sort(), disable: [...r.disable].sort() });
 
-test('categories default to malware, adult and piracy on', () => {
+test('categories default to malware, adult and piracy on (every other category off)', () => {
+  const on = ['cat_adult', 'cat_malware', 'cat_piracy'];
   assert.deepStrictEqual(sortIds(web.rulesetsFor(undefined)), {
-    enable: ['cat_adult', 'cat_malware', 'cat_piracy'],
-    disable: ['cat_bypass', 'cat_gambling', 'cat_social', 'cat_streaming'],
+    enable: on,
+    disable: web.WEB_CATEGORY_IDS.map(web.rulesetId).filter((id) => !on.includes(id)).sort(),
   });
+});
+test('kids and security categories exist and are off by default', () => {
+  for (const id of ['dating', 'drugs', 'hate', 'weapons', 'chat', 'mature', 'games', 'cryptomining', 'spyware', 'hacking',
+    'remote_access', 'dyndns', 'shortener', 'filesharing', 'webmail', 'shopping', 'jobsearch']) {
+    assert.ok(web.WEB_CATEGORY_IDS.includes(id), id);
+    assert.strictEqual(web.WEB_CATEGORY_DEFAULTS[id], false, id);
+  }
+  assert.ok(web.rulesetsFor({ dating: true }).enable.includes('cat_dating'));
+  assert.ok(web.rulesetsFor({ dating: false }).disable.includes('cat_dating'));
 });
 test('server switches override the defaults', () => {
   const r = sortIds(web.rulesetsFor({ adult: false, gambling: true }));
@@ -295,7 +318,7 @@ test('malformed category settings fall back to the safe defaults', () => {
   }
 });
 test('unknown categories are ignored', () => {
-  assert.ok(!('dating' in web.effectiveCategories({ dating: true })));
+  assert.ok(!('astrology' in web.effectiveCategories({ astrology: true })));
 });
 test('Safe Search follows adult blocking unless set explicitly', () => {
   assert.strictEqual(web.safeSearchOn(undefined, undefined), true);
@@ -481,41 +504,84 @@ test('name rules are plain case-insensitive domain anchors', () => {
   }
 });
 
-// --- AgentShield Windows app replies (src/shared/pc-app.ts) ---
-// config.ts reads the manifest version at load time
-globalThis.chrome = globalThis.chrome || { runtime: { getManifest: () => ({ version: 'test' }) } };
-const pcApp = load('src/shared/pc-app.ts');
-const goodCode = 'ASA1.' + Buffer.from(JSON.stringify({ u: 'https://api.example.com', t: 'asa_' + 'x'.repeat(40) })).toString('base64url');
+// --- Rules must be loaded before anything is enforced (src/shared/policy.ts) ---
+const policyModule = load('src/shared/policy.ts');
+test('catalog has the seventeen detector rules', () => assert.strictEqual(policyModule.CATALOG_RULE_IDS.length, 17));
+test('every catalog rule has an employee label and advice', () => {
+  for (const id of policyModule.CATALOG_RULE_IDS) {
+    assert.ok(policyModule.RULE_LABELS[id], `label ${id}`);
+    assert.ok(policyModule.RULE_ADVICE[id], `advice ${id}`);
+  }
+});
+test('new secrets and IDs are masked before any text leaves the browser', () => {
+  const masked = detector.maskSecretsForAudit(
+    'db postgres://admin:S3cr3tPass@db.internal:5432/app wallet 5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ ' +
+      'iban GB82 WEST 1234 5698 7654 32 my passport number is J8369854'
+  );
+  for (const secret of ['S3cr3tPass', 'MjxEXxiPuD5BDku4MkFq', 'WEST 1234 5698', 'J8369854']) assert.ok(!masked.includes(secret), secret);
+});
+test('policiesComplete needs a row for every catalog rule (fail closed until then)', () => {
+  assert.strictEqual(policyModule.policiesComplete(undefined), false);
+  assert.strictEqual(policyModule.policiesComplete([]), false);
+  assert.strictEqual(policyModule.policiesComplete(policies), false); // only four rules synced
+  const all = policyModule.CATALOG_RULE_IDS.map((rule_id) => ({ rule_id, enabled: false, action: 'ALLOW', severity: 'LOW', site_scope: '*' }));
+  assert.strictEqual(policyModule.policiesComplete(all), true);
+});
+test('a complete set with every rule Off enforces nothing', () => {
+  const all = policyModule.CATALOG_RULE_IDS.map((rule_id) => ({ id: rule_id, rule_id, category: '', name: '', action: 'BLOCK', severity: 'HIGH', enabled: false, version: 1 }));
+  assert.strictEqual(evaluateFindings(detector.detect('sk-demo-EXAMPLE123456789'), all, 'chatgpt.com').action, 'ALLOW');
+});
 
-test('pc app: no reply means the app is not installed', () => {
-  assert.strictEqual(pcApp.interpretCodeReply(null).state, 'missing');
-  assert.strictEqual(pcApp.interpretCodeReply(undefined).state, 'missing');
+// --- Page-level category check (src/shared/category-matcher.ts): same decision as the network rules ---
+const matcher = load('src/shared/category-matcher.ts');
+test('page-level matcher: domains with subdomains, site-name patterns and address keywords', () => {
+  const list = matcher.compileRules([
+    { condition: { requestDomains: ['bad.example', 'Other.Example'] } },
+    { condition: { urlFilter: '||pagalworld', isUrlFilterCaseSensitive: false } },
+    { condition: { regexFilter: '^https?://[^/?#]*mp3' } },
+  ]);
+  assert.ok(matcher.listMatches('bad.example', list) && matcher.listMatches('www.bad.example', list));
+  assert.ok(matcher.listMatches('other.example', list));
+  assert.ok(!matcher.listMatches('notbad.example', list) && !matcher.listMatches('bad.example.org', list));
+  assert.ok(matcher.listMatches('pagalworld.com.se', list) && matcher.listMatches('www.pagalworld.pw', list));
+  assert.ok(matcher.listMatches('new-mp3-songs.xyz', list) && !matcher.listMatches('example.com', list));
 });
-test('pc app: a valid code is handed over for normal activation', () => {
-  const r = pcApp.interpretCodeReply({ ok: true, code: goodCode });
-  assert.strictEqual(r.state, 'connected');
-  assert.strictEqual(r.code, goodCode);
+test('page-level matcher agrees with the shipped rulesets', () => {
+  const rules = (id) => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'rulesets', `${id}.json`), 'utf8'));
+  const gambling = matcher.compileRules(rules('gambling'));
+  assert.ok(matcher.listMatches(rules('gambling')[0].condition.requestDomains[0], gambling));
+  const streaming = matcher.compileRules(rules('streaming'));
+  assert.ok(matcher.listMatches('www.netflix.com', streaming) && matcher.listMatches('bhojpuri-songs.in', streaming));
+  assert.ok(!matcher.listMatches('www.youtube.com', streaming));
+  const dating = matcher.compileRules(rules('dating'));
+  assert.ok(matcher.listMatches('tinder.com', dating) && matcher.listMatches('www.jeevansathi.com', dating));
 });
-test('pc app: a malformed code is never used', () => {
-  for (const code of ['', 'ASA1.garbage', 'asa_plain', 'ASA1.' + Buffer.from(JSON.stringify({ u: 'ftp://x', t: 'asa_1234567890' })).toString('base64url')]) {
-    const r = pcApp.interpretCodeReply({ ok: true, code });
-    assert.notStrictEqual(r.state, 'connected', code);
-    assert.strictEqual(r.code, undefined);
-  }
+
+// --- Store package checks (scripts/packaging/store-packages.js) ---
+const store = require('../../scripts/packaging/store-packages.js');
+const storeManifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8'));
+delete storeManifest.key;
+const storeFiles = (m) => [{ name: 'manifest.json', data: Buffer.from(JSON.stringify(m)) }];
+test('store check: the shipped manifest asks only for the allowed permissions', () => {
+  assert.deepStrictEqual(storeManifest.permissions.filter((p) => !store.ALLOWED_PERMISSIONS.includes(p)), []);
+  assert.ok(!storeManifest.permissions.includes('nativeMessaging'));
 });
-test('pc app: PC not connected (or removed) keeps waiting for the person to connect it', () => {
-  for (const reason of ['NOT_CONNECTED', 'REVOKED', 'DEVICE_UNKNOWN', 'ACCOUNT_DISABLED']) {
-    assert.strictEqual(pcApp.interpretCodeReply({ ok: false, reason }).state, 'not_connected', reason);
-  }
+test('store check: native messaging, a manifest key and an .exe are refused', () => {
+  const bad = { ...storeManifest, key: 'abc', permissions: [...storeManifest.permissions, 'nativeMessaging'] };
+  const problems = store.validate([...storeFiles(bad), { name: 'helper/AgentShieldHelper.exe', data: Buffer.from('MZ') }], bad, { apiUrl: '', allowLocalhost: true });
+  assert.ok(problems.some((p) => p.includes('"key"')), problems.join('; '));
+  assert.ok(problems.some((p) => p.includes('nativeMessaging')), problems.join('; '));
+  assert.ok(problems.some((p) => p.includes('.exe')), problems.join('; '));
 });
-test('pc app: other refusals (plan ended, limits, network) are shown as errors', () => {
-  const r = pcApp.interpretCodeReply({ ok: false, reason: 'LICENSE_EXPIRED', message: 'Your plan has ended.' });
-  assert.strictEqual(r.state, 'error');
-  assert.strictEqual(r.message, 'Your plan has ended.');
+test('store check: a package without a server address is refused unless it is a test build', () => {
+  assert.ok(store.validate(storeFiles(storeManifest), storeManifest, { apiUrl: '', allowLocalhost: false }).some((p) => p.includes('--api-url')));
 });
-test('pc app: browser labels for the portal', () => {
-  assert.strictEqual(pcApp.browserLabel({ brands: [{ brand: 'Not_A Brand', version: '8' }, { brand: 'Chromium', version: '130' }, { brand: 'Microsoft Edge', version: '130' }] }), 'Microsoft Edge 130');
-  assert.strictEqual(pcApp.browserLabel(undefined), 'Chromium');
+
+// --- Browser labels for the portal (src/shared/browser-label.ts) ---
+const { browserLabel } = load('src/shared/browser-label.ts');
+test('browser labels for the portal', () => {
+  assert.strictEqual(browserLabel({ brands: [{ brand: 'Not_A Brand', version: '8' }, { brand: 'Chromium', version: '130' }, { brand: 'Microsoft Edge', version: '130' }] }), 'Microsoft Edge 130');
+  assert.strictEqual(browserLabel(undefined), 'Chromium');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

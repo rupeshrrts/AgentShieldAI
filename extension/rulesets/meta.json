@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-17T06:47:35.207Z",
-  "source": "HaGeZi DNS blocklists",
-  "license": "GPL-3.0",
+  "generated_at": "2026-10-26T07:03:48.094Z",
+  "source": "HaGeZi DNS blocklists; UT1 blacklists (Université Toulouse Capitole)",
+  "license": "GPL-3.0 (HaGeZi data); CC BY-SA 4.0 (UT1 data)",
   "categories": {
     "malware": {
       "domains": 226483,
@@ -10,6 +10,107 @@
         "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.mini-onlydomains.txt",
         "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/fake-onlydomains.txt"
       ]
+    },
+    "cryptomining": {
+      "domains": 11464,
+      "removed_protected": 26,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/cryptojacking/domains"
+      ]
+    },
+    "spyware": {
+      "domains": 510,
+      "removed_protected": 15,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/stalkerware/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 8,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "hacking": {
+      "domains": 197,
+      "removed_protected": 0,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/hacking/domains"
+      ]
+    },
+    "remote_access": {
+      "domains": 165,
+      "removed_protected": 5,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/remote-control/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 7,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "dyndns": {
+      "domains": 2075,
+      "removed_protected": 0,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/dynamic-dns/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 4,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "shortener": {
+      "domains": 4562,
+      "removed_protected": 0,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/shortener/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 0,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": [
+          "lnkd.in"
+        ]
+      }
+    },
+    "bypass": {
+      "domains": 15711,
+      "removed_protected": 618,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/doh-vpn-proxy-bypass-onlydomains.txt"
+      ]
+    },
+    "filesharing": {
+      "domains": 936,
+      "removed_protected": 4,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/filehosting/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 14,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "webmail": {
+      "domains": 397,
+      "removed_protected": 7,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/webmail/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 13,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
     },
     "adult": {
       "domains": 92084,
@@ -41,6 +142,68 @@
         "exclude_domains": []
       }
     },
+    "mature": {
+      "domains": 339,
+      "removed_protected": 3,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/mixed_adult/domains",
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/lingerie/domains"
+      ]
+    },
+    "dating": {
+      "domains": 10533,
+      "removed_protected": 13,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/dating/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 11,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "gambling": {
+      "domains": 134567,
+      "removed_protected": 24,
+      "sources": [
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.mini-onlydomains.txt"
+      ]
+    },
+    "drugs": {
+      "domains": 434,
+      "removed_protected": 2,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/drogue/domains"
+      ]
+    },
+    "hate": {
+      "domains": 264,
+      "removed_protected": 2,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/agressif/domains"
+      ]
+    },
+    "weapons": {
+      "domains": 35,
+      "removed_protected": 0,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/dangerous_material/domains"
+      ]
+    },
+    "chat": {
+      "domains": 184,
+      "removed_protected": 11,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/chat/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 7,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
     "piracy": {
       "domains": 55998,
       "removed_protected": 73,
@@ -55,13 +218,6 @@
         ],
         "exclude_domains": []
       }
-    },
-    "gambling": {
-      "domains": 134567,
-      "removed_protected": 24,
-      "sources": [
-        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.mini-onlydomains.txt"
-      ]
     },
     "social": {
       "domains": 8244,
@@ -87,13 +243,6 @@
         ]
       }
     },
-    "bypass": {
-      "domains": 15711,
-      "removed_protected": 618,
-      "sources": [
-        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/doh-vpn-proxy-bypass-onlydomains.txt"
-      ]
-    },
     "streaming": {
       "domains": 0,
       "removed_protected": 0,
@@ -114,6 +263,45 @@
           "pagal",
           "masti"
         ],
+        "exclude_domains": []
+      }
+    },
+    "games": {
+      "domains": 33536,
+      "removed_protected": 116,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/games/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 12,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "shopping": {
+      "domains": 36957,
+      "removed_protected": 6,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/shopping/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 16,
+        "name_patterns": 0,
+        "host_keywords": [],
+        "exclude_domains": []
+      }
+    },
+    "jobsearch": {
+      "domains": 60580,
+      "removed_protected": 160,
+      "sources": [
+        "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/jobsearch/domains"
+      ],
+      "agentshield_additions": {
+        "domains": 14,
+        "name_patterns": 0,
+        "host_keywords": [],
         "exclude_domains": []
       }
     }

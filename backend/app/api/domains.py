@@ -19,6 +19,7 @@ from app.api.schemas import (
     DomainRuleUpdate,
 )
 from app.core.audit import record_admin_action, snapshot
+from app.core.policy_revision import bump_policy_revision
 from app.db.models import DomainRule, User
 from app.db.session import get_db
 
@@ -112,6 +113,7 @@ def create_domain_rule(
         updated_at=datetime.now(timezone.utc),
     )
     db.add(rule)
+    bump_policy_revision(db, admin_user.organization_id)
     db.commit()
     db.refresh(rule)
     record_admin_action(
@@ -156,6 +158,7 @@ def update_domain_rule(
         rule.enabled = payload.enabled
 
     rule.updated_at = datetime.now(timezone.utc)
+    bump_policy_revision(db, admin_user.organization_id)
     db.commit()
     db.refresh(rule)
     record_admin_action(
@@ -190,6 +193,7 @@ def delete_domain_rule(
 
     before = snapshot(rule, _DOMAIN_FIELDS)
     db.delete(rule)
+    bump_policy_revision(db, admin_user.organization_id)
     db.commit()
     record_admin_action(
         db, organization_id=admin_user.organization_id, actor=admin_user.email, action="domain.delete",

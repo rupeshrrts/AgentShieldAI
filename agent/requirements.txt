@@ -1,0 +1,6 @@
+# AgentShield Network Agent (free, self-hosted). The backend's detector and policy evaluator are
+# imported from ../backend, so this list is only what the agent itself needs.
+cryptography>=42.0.0
+# Only for the mitmproxy-based proxy (agent/mitm/agentshield_addon.py). The built-in `run` proxy and
+# all tests work without it.
+mitmproxy>=10.0.0

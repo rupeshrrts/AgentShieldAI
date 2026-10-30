@@ -207,4 +207,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { makeZip, makeCrx3, extensionIdFromSpki, crc32 };
+module.exports = { makeZip, makeCrx3, extensionIdFromSpki, crc32, INCLUDE, collect };

@@ -1,14 +1,31 @@
 {
-  "_comment": "Blockable website categories. Ids must match WEB_CATEGORIES in backend/app/core/catalog.py (checked by backend/tests/test_web_filter.py). Lists are built into rulesets/<id>.json by scripts/update-web-categories.js from the HaGeZi DNS blocklists (GPL-3.0, see rulesets/LICENSE-DATA.md) plus AgentShield's own additions (web-category-additions.json); 'streaming' has no downloaded list, only the additions.",
+  "_comment": "Blockable website categories. Ids and order must match WEB_CATEGORIES in backend/app/core/catalog.py (checked by backend/tests/test_web_filter.py). Lists are built into rulesets/<id>.json by scripts/update-web-categories.js. A source that is a file name comes from the HaGeZi DNS blocklists (GPL-3.0, source_base); a full https:// address from the UT1 blacklists of Université Toulouse Capitole (CC BY-SA 4.0); see rulesets/LICENSE-DATA.md. AgentShield's own additions are in web-category-additions.json; 'streaming' has no downloaded list, only the additions.",
   "source_base": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/",
   "categories": [
     { "id": "malware", "default": true, "sources": ["tif.mini-onlydomains.txt", "fake-onlydomains.txt"] },
-    { "id": "adult", "default": true, "sources": ["nsfw-onlydomains.txt"] },
-    { "id": "piracy", "default": true, "sources": ["anti.piracy-onlydomains.txt"] },
-    { "id": "gambling", "default": false, "sources": ["gambling.mini-onlydomains.txt"] },
-    { "id": "social", "default": false, "sources": ["social-onlydomains.txt"] },
+    { "id": "cryptomining", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/cryptojacking/domains"] },
+    { "id": "spyware", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/stalkerware/domains"] },
+    { "id": "hacking", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/hacking/domains"] },
+    { "id": "remote_access", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/remote-control/domains"] },
+    { "id": "dyndns", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/dynamic-dns/domains"] },
+    { "id": "shortener", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/shortener/domains"] },
     { "id": "bypass", "default": false, "sources": ["doh-vpn-proxy-bypass-onlydomains.txt"] },
-    { "id": "streaming", "default": false, "sources": [] }
+    { "id": "filesharing", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/filehosting/domains"] },
+    { "id": "webmail", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/webmail/domains"] },
+    { "id": "adult", "default": true, "sources": ["nsfw-onlydomains.txt"] },
+    { "id": "mature", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/mixed_adult/domains", "https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/lingerie/domains"] },
+    { "id": "dating", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/dating/domains"] },
+    { "id": "gambling", "default": false, "sources": ["gambling.mini-onlydomains.txt"] },
+    { "id": "drugs", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/drogue/domains"] },
+    { "id": "hate", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/agressif/domains"] },
+    { "id": "weapons", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/dangerous_material/domains"] },
+    { "id": "chat", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/chat/domains"] },
+    { "id": "piracy", "default": true, "sources": ["anti.piracy-onlydomains.txt"] },
+    { "id": "social", "default": false, "sources": ["social-onlydomains.txt"] },
+    { "id": "streaming", "default": false, "sources": [] },
+    { "id": "games", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/games/domains"] },
+    { "id": "shopping", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/shopping/domains"] },
+    { "id": "jobsearch", "default": false, "sources": ["https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/jobsearch/domains"] }
   ],
   "never_block": [
     "google.com", "googleapis.com", "gstatic.com", "googleusercontent.com", "youtube.com", "ytimg.com",
@@ -17,6 +34,8 @@
     "github.com", "githubusercontent.com", "wikipedia.org", "cloudflare.com",
     "blogspot.com", "wordpress.com",
     "chatgpt.com", "openai.com", "claude.ai", "anthropic.com", "perplexity.ai", "deepseek.com",
-    "mistral.ai", "poe.com", "meta.ai", "grok.com"
+    "mistral.ai", "poe.com", "meta.ai", "grok.com",
+    "linkedin.com", "outlook.com", "hotmail.com", "gmail.com", "zoom.us", "slack.com", "notion.so",
+    "atlassian.net", "salesforce.com"
   ]
 }

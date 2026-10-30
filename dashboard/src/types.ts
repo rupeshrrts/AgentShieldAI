@@ -257,6 +257,10 @@ export interface OrgSettings {
   /** Safe Search / YouTube Restricted Mode */
   safe_search?: boolean;
   web_category_catalog?: WebCategory[];
+  /** Headings the category switches are grouped under */
+  web_category_groups?: WebCategoryGroup[];
+  /** One-click settings (each sets every category; safe_search null = unchanged) */
+  web_category_presets?: WebCategoryPreset[];
   demo_mode: boolean;
   updated_by?: string;
   updated_at?: string;
@@ -267,6 +271,21 @@ export interface WebCategory {
   name: string;
   description: string;
   default: boolean;
+  group?: string;
+}
+
+export interface WebCategoryGroup {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface WebCategoryPreset {
+  id: string;
+  name: string;
+  description: string;
+  categories: Record<string, boolean>;
+  safe_search: boolean | null;
 }
 
 export interface RuleCatalogItem {
@@ -333,7 +352,7 @@ export interface DistributionInfo {
   zip_sha256?: string | null;
   zip_size?: number | null;
   store_links?: { chrome: string | null; edge: string | null };
-  downloads?: { system_setup: boolean; extension_zip: boolean };
+  downloads?: { extension_zip: boolean; network_agent?: boolean };
 }
 
 // --- Licensing (SaaS) ---

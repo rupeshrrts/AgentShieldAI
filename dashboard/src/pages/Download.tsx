@@ -5,7 +5,6 @@ import { NavTab } from '../components/Sidebar';
 import { api } from '../services/api';
 import { AuthorizedDevice, BillingStatus, DistributionInfo, ReleaseInfo } from '../types';
 import { ACCESS_STATES, formatDate, formatDateTime, parseUtc } from '../utils/format';
-import { isWindowsVisitor } from '../utils/platform';
 
 type Browser = 'chrome' | 'edge';
 
@@ -51,7 +50,7 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
   const sha = info?.zip_sha256 || release?.sha256 || null;
   const live = devices.filter((d) => d.status !== 'REVOKED');
 
-  const download = async (file: 'agentshield-extension.zip' | 'AgentShield-System-Setup.exe') => {
+  const download = async (file: 'agentshield-extension.zip' | 'AgentShield-Agent.exe') => {
     setDlError('');
     setDownloading(true);
     try {
@@ -70,16 +69,16 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // One way first, matching the visitor's computer: AgentShield for Windows on Windows (when published),
-  // the browser extension elsewhere. The other way stays under "Other ways to install".
-  const windowsFirst = isWindowsVisitor() && Boolean(info?.downloads?.system_setup);
+  // The browser extension (Chrome Web Store / Edge Add-ons, or the .zip) is the way to install AgentShield; it needs
+  // no Windows program. The optional Network Agent (a separate Windows program) is listed after it.
   const windowsWay = (
     <>
-  {info?.downloads?.system_setup && (
+  {info?.downloads?.network_agent && (
     <section className="glass-panel" style={{ padding: '24px' }}>
-      <SectionHeader icon={<Monitor size={18} />} title="AgentShield for Windows · every browser at once" right={<span className="chip">Recommended on Windows</span>}>
-        One setup adds AgentShield to Chrome, Edge and Brave on this PC. At the end you connect the PC once, and every
-        browser connects by itself. The PC uses one device of your plan.
+      <SectionHeader icon={<Monitor size={18} />} title="Optional: AgentShield Network Agent for Windows" right={<span className="chip">Not needed for the extension</span>}>
+        One program protects AI sites in <strong>every</strong> browser on this PC — Chrome, Edge, Brave, Opera and Firefox — and in
+        desktop AI apps. No browser extension, no Developer mode, no Load unpacked. It checks only AI sites; all other browsing is
+        untouched. The PC uses one device of your plan.
       </SectionHeader>
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', margin: '4px 0 14px' }}>
         {locked ? (
@@ -87,24 +86,22 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
             <Lock size={15} /> Download locked: no active plan
           </button>
         ) : (
-          <button type="button" className="btn-primary" disabled={downloading} onClick={() => download('AgentShield-System-Setup.exe')}>
+          <button type="button" className="btn-primary" disabled={downloading} onClick={() => download('AgentShield-Agent.exe')}>
             <DownloadIcon size={15} /> {downloading ? 'Starting download...' : 'Download for Windows (.exe)'}
           </button>
         )}
       </div>
       <ol className="steps" style={{ marginLeft: 18 }}>
-        <li>Run <strong>AgentShield-System-Setup.exe</strong> and click <strong>Yes</strong> when Windows asks for permission.</li>
-        <li>At the end, leave <strong>Connect this PC</strong> ticked and click <strong>Finish</strong>.</li>
         <li>
           In <button type="button" className="link-btn" onClick={() => onNavigate('activation')}>Connect browser</button>, click{' '}
-          <strong>Connect this PC</strong> (or generate a code and paste it into the AgentShield window). Done: restart your browsers if the
-          AgentShield icon does not appear yet.
+          <strong>Generate activation code</strong> and copy the code.
         </li>
+        <li>Run <strong>AgentShield-Agent.exe</strong>, click <strong>Yes</strong> when Windows asks for permission, and paste the code when it asks.</li>
+        <li>Restart your browsers. AI sites are now protected everywhere on this PC — no extension, no Developer mode.</li>
       </ol>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 10 }}>
-        The browsers show &ldquo;Managed by your organization&rdquo; because AgentShield is installed through browser policy, so it cannot
-        be switched off by accident. Uninstall it from Windows Settings &gt; Apps.
-        {!individual && ' IT teams can also run it silently for every PC: see Deployment & Settings.'}
+        The agent is not code-signed yet, so Windows SmartScreen may show &ldquo;more info &rarr; run anyway&rdquo; on first run.
+        Remove it any time: run <code>AgentShield-Agent.exe uninstall</code> as administrator.
       </p>
     </section>
   )}
@@ -196,7 +193,7 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
         <h1 className="page-title">Download</h1>
-        <p className="page-subtitle">Install AgentShield, then connect it to your account. On Windows, one setup covers every browser.</p>
+        <p className="page-subtitle">Add the AgentShield extension to Chrome or Edge, then connect it to your account. No Windows program is needed.</p>
       </div>
 
       {status && !licensed && (
@@ -211,14 +208,9 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
       )}
       {dlError && <div className="callout callout-warning">{dlError}</div>}
 
-      {windowsFirst ? windowsWay : extensionWay}
-
-      {info?.downloads?.system_setup && (
-        <details className="disclosure other-ways">
-          <summary>{windowsFirst ? 'Other ways to install: the extension for one browser (any computer)' : 'Other ways to install: AgentShield for Windows (every browser on a PC)'}</summary>
-          {windowsFirst ? extensionWay : windowsWay}
-        </details>
-      )}
+      {/* The extension first; the optional Network Agent after it */}
+      {extensionWay}
+      {windowsWay}
 
       {/* Connection status */}
       <section className="glass-panel" style={{ padding: '24px' }}>

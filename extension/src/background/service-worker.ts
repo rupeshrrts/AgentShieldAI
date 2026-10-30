@@ -14,12 +14,19 @@
  *   server challenge with that key. It is kept only in memory and chrome.storage.session
  *   (cleared when the browser closes) and is re-validated by the server on every call.
  * - Revocation, a disabled account or an unreachable server lock the browser again.
+ *
+ * Rules (near real time):
+ * - Every minute the worker asks the server for the organization's blocking revision. When it
+ *   changed (any rule, website control, website rule, keyword or setting), the full policy is
+ *   downloaded and applied at once; a full sync also runs at least every 5 minutes.
+ * - Only rules that are On in the dashboard are enforced (shared/policy.ts, shared/web-categories.ts).
  */
 import { ExtensionSyncState, SecurityEventPayload } from '../shared/types';
-import { DEFAULT_API_BASE_URL, EXTENSION_VERSION, loadClientConfig, parseActivationCode, serverLockedByAdmin } from '../shared/config';
-import { BlockReason, DomainLists, RULE_FOR_REASON, decideHost, lockedAiHosts, unapprovedAiDomains } from '../shared/domains';
+import { DEFAULT_API_BASE_URL, DEFAULT_DASHBOARD_URL, EXTENSION_VERSION, loadClientConfig, parseActivationCode, serverLockedByAdmin } from '../shared/config';
+import { BlockReason, DomainLists, RULE_FOR_REASON, decideHost, lockedAiHosts, matchesDomain, unapprovedAiDomains } from '../shared/domains';
+import { CategoryList, compileRules, listMatches } from '../shared/category-matcher';
 import { createDeviceIdentity, deleteDeviceIdentity, hasDeviceIdentity, signWithDeviceKey } from '../shared/device-identity';
-import { PC_APP_HOST, PcAppReply, PcAppState, browserLabel, interpretCodeReply } from '../shared/pc-app';
+import { browserLabel } from '../shared/browser-label';
 import { CATEGORY_LABELS, WEB_CATEGORY_IDS, effectiveCategories, rulesetsFor, safeSearchOn, safeSearchRules } from '../shared/web-categories';
 import {
   AuthEvent,
@@ -51,16 +58,23 @@ const DEFAULT_BLOCKED_DOMAINS = [
 
 const MAX_QUEUED_EVENTS = 500;
 const USER_STATUS_TTL_MS = 30_000;
-// Refresh the session when less than this remains (the periodic alarm runs every 5 minutes)
+// Refresh the session when less than this remains (the periodic alarm runs every minute)
 const SESSION_REFRESH_MARGIN_MS = 6 * 60_000;
+// Chrome's minimum alarm period for installed extensions
+const REFRESH_ALARM_MINUTES = 1;
+// Full policy download at least this often, even when the revision check says nothing changed
+const FULL_SYNC_INTERVAL_MS = 5 * 60_000;
 // Network rule ID ranges and priorities: explicit blocks (4) > activation lock (3) > allows (2) >
 // unapproved AI (1) and website categories (static rulesets, 1). Safe Search rules use 40001+.
 const RULE_ID_BLOCK = 1;
 const RULE_ID_ALLOW = 10_001;
 const RULE_ID_AI = 20_001;
 const RULE_ID_LOCK = 30_001;
-// AgentShield Windows app: ask it at most this often on its own (the popup can ask at once)
-const PC_APP_MIN_INTERVAL_MS = 20_000;
+
+// Only in end-to-end test builds (node build.js --e2e, used by tests/e2e/rules-e2e.js): the test drives the popup
+// page in a tab, which has a tab. Development and store builds never define it, so the check below stays strict.
+declare const __AGENTSHIELD_E2E__: boolean | undefined;
+const E2E_BUILD = typeof __AGENTSHIELD_E2E__ === 'boolean' && __AGENTSHIELD_E2E__;
 
 /** Non-secret record of this browser's activation (the private key lives in IndexedDB). */
 interface ActivationRecord {
@@ -90,13 +104,10 @@ class BackgroundService {
   private retryIndex = 0;
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;
   private lockTimer: ReturnType<typeof setTimeout> | null = null;
-  /** AgentShield Windows app on this PC (connects this browser without a pasted code) */
-  private pcApp: PcAppState = 'unknown';
-  private pcAppMessage = '';
-  private pcAppLastTry = 0;
-  private pcAppInFlight: Promise<void> | null = null;
-  /** Set by "Sign out this browser" so the app does not reconnect it at once; it only stops asking. */
-  private pcAutoConnectPaused = false;
+  /** When the full policy was last downloaded (0 = never in this worker's life). */
+  private lastFullSyncAt = 0;
+  /** Category rulesets loaded for page-level checks (only the switched-on ones, on first use). */
+  private categoryLists = new Map<string, Promise<CategoryList>>();
 
   private syncState: ExtensionSyncState = {
     is_active: true,
@@ -206,22 +217,18 @@ class BackgroundService {
       }
     });
 
-    // Refresh the session and sync policies every 5 minutes
-    chrome.alarms.create('policy-refresh', { periodInMinutes: 5 });
+    // Check for changed rules and refresh the session every minute
+    chrome.alarms.create('policy-refresh', { periodInMinutes: REFRESH_ALARM_MINUTES });
     chrome.alarms.onAlarm.addListener((alarm: chrome.alarms.Alarm) => {
       if (alarm.name === 'policy-refresh') {
         this.ready.then(() => this.periodicRefresh());
-      } else if (alarm.name === 'pc-app-connect') {
-        this.ready.then(() => this.connectViaPcApp());
       }
     });
   }
 
   private async init() {
     try {
-      const stored = await chrome.storage.local.get(['syncState', 'blocked_domains', 'allowed_domains', 'installId', 'activation', 'pcAutoConnectPaused']);
-      // Only ever stops automatic connection through the Windows app; never grants anything
-      this.pcAutoConnectPaused = stored.pcAutoConnectPaused === true;
+      const stored = await chrome.storage.local.get(['syncState', 'blocked_domains', 'allowed_domains', 'installId', 'activation']);
       if (stored.syncState) {
         // Rules and display data only: the authorization state is never restored from storage
         const { auth_state: _a, auth_message: _m, ...rest } = stored.syncState;
@@ -286,8 +293,6 @@ class BackgroundService {
     if (!this.activation || !(await hasDeviceIdentity())) {
       await this.dropSession();
       await this.transition({ type: 'START', activated: false });
-      // Not activated: if this PC was connected in the AgentShield Windows app, get a code from it
-      void this.connectViaPcApp();
       return;
     }
     // Refreshing a live session happens quietly; AI sites stay usable until it actually expires.
@@ -363,7 +368,7 @@ class BackgroundService {
   }
 
   private scheduleRetry() {
-    if (this.retryIndex >= RETRY_DELAYS_MS.length) return; // the 5-minute alarm or a manual Retry continues
+    if (this.retryIndex >= RETRY_DELAYS_MS.length) return; // the periodic alarm or a manual Retry continues
     const delay = RETRY_DELAYS_MS[this.retryIndex++];
     setTimeout(() => void this.authenticate(), delay);
   }
@@ -386,16 +391,28 @@ class BackgroundService {
     await this.authenticate();
   }
 
+  /** Every minute: re-check the session, or ask whether the rules changed (full download only then). */
   private async periodicRefresh() {
-    if (!this.activation) {
-      await this.connectViaPcApp();
-      return;
-    }
+    if (!this.activation) return;
     if (!this.authorized() || !this.session || this.session.expiresAt - Date.now() < SESSION_REFRESH_MARGIN_MS) {
       this.retryIndex = 0;
       await this.authenticate();
-    } else {
+      return;
+    }
+    if (Date.now() - this.lastFullSyncAt >= FULL_SYNC_INTERVAL_MS || (await this.revisionChanged())) {
       await this.syncPolicies();
+    }
+  }
+
+  /** Cheap check: did the organization change anything this browser enforces since the last full sync? */
+  private async revisionChanged(): Promise<boolean> {
+    try {
+      const res = await this.apiFetch('/api/v1/policies/revision');
+      if (!res.ok) return false;
+      const data = await res.json();
+      return typeof data.revision === 'number' && data.revision !== this.syncState.policy_revision;
+    } catch {
+      return false;
     }
   }
 
@@ -414,7 +431,9 @@ class BackgroundService {
     this.activation = null;
     this.syncState.user_email = undefined;
     this.syncState.policies = [];
+    this.syncState.policy_revision = undefined;
     this.syncState.keywords = undefined;
+    this.lastFullSyncAt = 0;
     await chrome.storage.local.remove('activation');
   }
 
@@ -497,59 +516,7 @@ class BackgroundService {
       await this.apiFetch('/api/v1/device/deactivate', { method: 'POST' }).catch(() => undefined);
     }
     await this.forgetDevice();
-    // Signed out on purpose: do not reconnect through the Windows app until the person asks again
-    await this.setPcAutoConnectPaused(true);
     await this.transition({ type: 'SIGNED_OUT' });
-  }
-
-  // ------------------------------------------------------------------ AgentShield Windows app
-
-  private async setPcAutoConnectPaused(paused: boolean) {
-    this.pcAutoConnectPaused = paused;
-    await chrome.storage.local.set({ pcAutoConnectPaused: paused }).catch(() => undefined);
-  }
-
-  /** One request to the Windows app; null when it is not installed (or cannot be started). */
-  private askPcApp(message: Record<string, unknown>): Promise<PcAppReply | null> {
-    return new Promise((resolve) => {
-      try {
-        if (!chrome.runtime.sendNativeMessage) return resolve(null);
-        chrome.runtime.sendNativeMessage(PC_APP_HOST, message, (reply: PcAppReply) => {
-          resolve(chrome.runtime.lastError ? null : reply || null);
-        });
-      } catch {
-        resolve(null);
-      }
-    });
-  }
-
-  /**
-   * Not activated: ask the Windows app for a single-use code and activate with it like a pasted code.
-   * While the app is installed but the PC is not connected yet, ask again every minute, so the browser
-   * connects by itself shortly after the person connects the PC.
-   */
-  private async connectViaPcApp(force = false): Promise<void> {
-    if (this.activation || (this.pcAutoConnectPaused && !force)) return;
-    if (this.pcAppInFlight) return this.pcAppInFlight;
-    if (!force && Date.now() - this.pcAppLastTry < PC_APP_MIN_INTERVAL_MS) return;
-    this.pcAppLastTry = Date.now();
-    this.pcAppInFlight = (async () => {
-      const result = interpretCodeReply(await this.askPcApp({ type: 'GET_CODE', browser: browserLabel((navigator as any).userAgentData) }));
-      this.pcApp = result.state;
-      this.pcAppMessage = result.message || '';
-      if (result.state === 'not_connected') {
-        chrome.alarms.create('pc-app-connect', { periodInMinutes: 1 });
-      } else {
-        await chrome.alarms.clear('pc-app-connect').catch(() => false);
-      }
-      if (result.code && !this.activation) {
-        const outcome = await this.activate(result.code);
-        if (!outcome.ok && outcome.error) this.pcAppMessage = outcome.error;
-      }
-    })().finally(() => {
-      this.pcAppInFlight = null;
-    });
-    return this.pcAppInFlight;
   }
 
   // ------------------------------------------------------------------ authorized API calls
@@ -576,6 +543,8 @@ class BackgroundService {
       if (!res.ok) throw new Error(`Policy sync failed (HTTP ${res.status}).`);
       const data = await res.json();
       this.syncState.policy_version = data.policy_version || this.syncState.policy_version;
+      // Read before the other calls: a change made meanwhile makes the next revision check download again
+      if (typeof data.policy_revision === 'number') this.syncState.policy_revision = data.policy_revision;
       this.syncState.organization_id = data.organization_id || this.syncState.organization_id;
       if (data.organization_name) this.syncState.organization_name = data.organization_name;
       if (Array.isArray(data.policies)) this.syncState.policies = data.policies;
@@ -606,6 +575,7 @@ class BackgroundService {
       }
       await this.applyBlockingRules();
 
+      this.lastFullSyncAt = Date.now();
       this.syncState.is_online = true;
       this.syncState.last_error = undefined;
       this.syncState.last_synced_at = new Date().toISOString();
@@ -627,7 +597,6 @@ class BackgroundService {
     if (!this.activation) return;
     try {
       const uaData = (navigator as any).userAgentData;
-      const brand = uaData?.brands?.find((b: any) => !/not.?a.?brand|chromium/i.test(b.brand));
       await this.apiFetch('/api/v1/endpoints/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -635,7 +604,7 @@ class BackgroundService {
           device_id: this.activation.deviceId,
           user_id: this.activation.email,
           extension_version: EXTENSION_VERSION,
-          browser: brand ? `${brand.brand} ${brand.version}` : 'Chromium',
+          browser: browserLabel(uaData),
           platform: uaData?.platform || navigator.platform || '',
           policy_version: this.syncState.policy_version,
           enrollment_source: 'activation',
@@ -708,6 +677,82 @@ class BackgroundService {
       console.warn('[AgentShield SW] Failed to install network blocking rules:', e);
     }
     await this.applyCategoryRules();
+    await this.sweepOpenTabs();
+  }
+
+  // ------------------------------------------------------------------ page-level checks (backup for the network rules)
+
+  private categoryList(id: string): Promise<CategoryList> {
+    let list = this.categoryLists.get(id);
+    if (!list) {
+      list = fetch(chrome.runtime.getURL(`rulesets/${id}.json`))
+        .then((r) => r.json())
+        .then(compileRules)
+        .catch(() => compileRules([]));
+      this.categoryLists.set(id, list);
+    }
+    return list;
+  }
+
+  /**
+   * The block page a page on this host must show, or null. Same order as the network rules: the
+   * dashboard's BLOCK rules, the activation lock, ALLOW rules (also exceptions to categories),
+   * unapproved AI tools and switched-on website categories.
+   */
+  private async pageBlock(host: string): Promise<{ url: string; reason: BlockReason | 'category'; category?: string } | null> {
+    const lists = this.lists();
+    const reason = decideHost(host, lists);
+    if (reason) return { url: this.blockedPageUrl(host, reason), reason };
+    if (lists.allowed.some((d) => matchesDomain(host, d))) return null;
+    const on = effectiveCategories(this.syncState.settings.web_categories);
+    for (const id of WEB_CATEGORY_IDS) {
+      if (!on[id]) continue;
+      if (listMatches(host, await this.categoryList(id))) {
+        return { url: chrome.runtime.getURL(`blocked.html?reason=category&category=${id}`), reason: 'category', category: id };
+      }
+    }
+    return null;
+  }
+
+  /** Sends a tab that shows a blocked page to the block page, and logs it like a network block. */
+  private async blockTabIfNeeded(tabId: number, pageUrl: string | undefined, skipLock = false): Promise<boolean> {
+    if (!pageUrl || !/^https?:/i.test(pageUrl)) return false;
+    let host = '';
+    try {
+      host = new URL(pageUrl).hostname.toLowerCase();
+    } catch {
+      return false;
+    }
+    const block = await this.pageBlock(host);
+    if (!block) return false;
+    // An open AI tab is not replaced when the browser locks for a moment (e.g. while reconnecting):
+    // nothing can be sent from it while locked, and it works again once the session is back.
+    if (skipLock && block.reason === 'activation_required') return false;
+    await chrome.tabs.update(tabId, { url: block.url }).catch(() => undefined);
+    if (block.reason === 'category' && block.category) this.recordCategoryBlock(block.category);
+    else if (block.reason !== 'category') this.recordDomainBlock(host, block.reason);
+    return true;
+  }
+
+  /**
+   * When what is blocked changes (a rule switched on, the browser locked), already-open tabs are checked too:
+   * network rules only act on new page loads. Runs once per change, also across service-worker restarts.
+   */
+  private async sweepOpenTabs() {
+    try {
+      const lists = this.lists();
+      const on = effectiveCategories(this.syncState.settings.web_categories);
+      const signature = JSON.stringify([lists.blocked, lists.allowed, lists.blockUnapprovedAi, lists.aiDomains, on]);
+      const kept = await chrome.storage.session.get(['sweepSignature']).catch(() => ({} as any));
+      if (kept.sweepSignature === signature) return;
+      await chrome.storage.session.set({ sweepSignature: signature }).catch(() => undefined);
+      const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+      for (const tab of tabs) {
+        if (tab.id !== undefined) await this.blockTabIfNeeded(tab.id, tab.url, true);
+      }
+    } catch (e) {
+      console.warn('[AgentShield SW] Could not check open tabs:', e);
+    }
   }
 
   /**
@@ -751,12 +796,11 @@ class BackgroundService {
       allowedDomainsCount: this.allowedDomains.length,
       api_url: this.apiUrl(),
       server_locked: serverLockedByAdmin({ apiUrl: this.configApiUrl }),
-      // AgentShield Windows app on this PC: missing / not_connected / connected / error (display only)
-      pc_app: this.pcApp,
-      pc_app_message: this.pcAppMessage,
-      pc_auto_connect_paused: this.pcAutoConnectPaused,
-      // IT-set dashboard address; otherwise the dashboard is usually served by the same server
-      dashboard_url: this.dashboardUrl || (/\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(this.apiUrl()) ? 'http://localhost:5173' : this.apiUrl()),
+      // IT-set dashboard address, then the store build's portal; otherwise the dashboard is usually served by the same server
+      dashboard_url:
+        this.dashboardUrl ||
+        DEFAULT_DASHBOARD_URL ||
+        (/\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(this.apiUrl()) ? 'http://localhost:5173' : this.apiUrl()),
     };
   }
 
@@ -767,12 +811,11 @@ class BackgroundService {
     }
     // Account actions are only accepted from the extension's own pages (the popup),
     // never from content scripts running inside web pages.
-    const fromExtensionPage = !sender.tab && typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
+    const fromExtensionPage =
+      (E2E_BUILD || !sender.tab) && typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
 
     switch (message.type) {
       case 'GET_STATUS':
-        // Opening the popup of a locked browser also asks the Windows app (rate-limited)
-        if (!this.activation && fromExtensionPage) void this.connectViaPcApp();
         sendResponse(this.statusResponse());
         break;
 
@@ -811,23 +854,8 @@ class BackgroundService {
           sendResponse({ ok: false, error: 'Not allowed.' });
           break;
         }
-        await this.setPcAutoConnectPaused(false);
         sendResponse(await this.activate(String(message.code || '')));
         break;
-
-      case 'CONNECT_VIA_PC': {
-        // Popup: "Connect with the AgentShield app". Connects at once when the PC is connected;
-        // otherwise opens the app's window to connect the PC.
-        if (!fromExtensionPage) {
-          sendResponse({ ok: false, error: 'Not allowed.' });
-          break;
-        }
-        await this.setPcAutoConnectPaused(false);
-        await this.connectViaPcApp(true);
-        if (this.pcApp === 'not_connected') await this.askPcApp({ type: 'OPEN_CONNECT' });
-        sendResponse({ ok: this.authorized(), pc_app: this.pcApp, error: this.pcAppMessage || undefined });
-        break;
-      }
 
       case 'SIGN_OUT':
         if (!fromExtensionPage) {
@@ -853,6 +881,16 @@ class BackgroundService {
           if (reason) this.recordDomainBlock(host, reason);
         }
         sendResponse({ received: true });
+        break;
+
+      case 'CHECK_PAGE':
+        // A page restored from the back/forward cache (no network request, so no network rule ran).
+        // The address is taken from the browser's own tab record, never from the message.
+        if (sender.tab?.id !== undefined) {
+          sendResponse({ blocked: await this.blockTabIfNeeded(sender.tab.id, sender.tab.url) });
+        } else {
+          sendResponse({ blocked: false });
+        }
         break;
 
       case 'CATEGORY_BLOCKED': {
@@ -910,7 +948,7 @@ class BackgroundService {
       site: `${category} website`,
       rule_id: `dlp.category.${category}`,
       category: 'WEB_FILTER',
-      severity: category === 'malware' ? 'HIGH' : 'MEDIUM',
+      severity: ['malware', 'cryptomining', 'spyware', 'hacking', 'remote_access'].includes(category) ? 'HIGH' : 'MEDIUM',
       action: 'BLOCK',
       outcome: 'navigation_blocked',
       prompt: `${label} (website category: ${category}).`,

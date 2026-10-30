@@ -271,7 +271,7 @@ class ApiService {
   /** Absolute URL of a file offered for download by the backend (installer, extension zip). */
   /** Downloads go through a 5-minute link that the server issues only to accounts with an active plan
    *  (each link is new, so a browser never reuses a copy cached from an earlier version). */
-  public async downloadFile(file: 'AgentShield-System-Setup.exe' | 'agentshield-extension.zip'): Promise<void> {
+  public async downloadFile(file: 'agentshield-extension.zip' | 'AgentShield-Agent.exe'): Promise<void> {
     const res = await this.authFetch(`${API_BASE_URL}/api/v1/me/download-link`, { method: 'POST', body: JSON.stringify({ file }) });
     if (!res.ok) throw new Error(await errorMessage(res, 'Could not start the download'));
     const { url } = await res.json();

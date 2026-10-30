@@ -3,87 +3,59 @@
         Protects company data in ChatGPT and other AI tools
 ========================================================================
 
-YOU NEED: Windows 10 or 11 with Google Chrome, Microsoft Edge or Brave
-(version 110 or newer), and an AgentShield account with an active plan,
-the Free plan or prepaid credits.
+YOU NEED: Google Chrome or Microsoft Edge (version 110 or newer) and an
+AgentShield account with an active plan, the Free plan or prepaid credits.
   - For yourself: "Create an account" > Individual (Company is
     "coming soon"), then confirm your email from the link we send.
-    You then have the Free plan; Account & plan offers the 30-day
-    trial, plans and credits.
   - Employees of an existing company workspace: use the invite email
     from your company's admin. Do NOT click "Create an account" - that
     creates a separate, individual account.
+No Windows program is needed: AgentShield is a browser extension.
 The extension never asks for your email or password. Installing alone
 gives no access: AI sites stay blocked until you connect.
 
 ------------------------------------------------------------------------
-EASIEST ON WINDOWS: AgentShield-System-Setup.exe (every browser at once)
-  1. Run AgentShield-System-Setup.exe and click Yes when Windows asks.
-     It adds AgentShield to Chrome, Edge and Brave and installs the
-     AgentShield app.
-  2. At the end leave "Connect this PC to my AgentShield account now"
-     ticked and click Finish. The "Connect AgentShield" window opens.
-  3. Sign in to the AgentShield portal, open Connect browser and click
-     "Connect this PC" (then "Open AgentShield" and "Connect").
-     Or click "Generate activation code" and paste the code (starts
-     with ASA1.) into the Connect AgentShield window.
-  4. Done. Every browser on this PC connects by itself within a minute
-     (restart the browsers if the AgentShield icon is not there yet).
-  Your PC uses ONE device of your plan, however many browsers it has.
-  Other Windows users of this PC: open "Connect AgentShield" from the
-  Start menu and connect with their own account.
-  Remove a PC in the portal (Connect browser > Remove PC) or in the
-  Connect AgentShield window (Disconnect). Uninstall: Windows Settings >
-  Apps > AgentShield.
-  NOTE: on a personal PC, browsers only accept this automatic install
-  when the extension is published in the Chrome Web Store / Edge Add-ons
-  (the server then uses the store copies). The browsers show "Managed by
-  your organization" because AgentShield is installed by policy.
+INSTALL
+  From the store (once published): open the store link on the portal's
+  Download page and click "Add to Chrome" / "Get".
 
-ONE BROWSER ONLY (any computer): Quick-Install.bat or the store
-  1. Make sure the "extension" folder is next to Quick-Install.bat and
-     double-click it (or install from the store link on the Download page).
-  2. On the Extensions page that opens: turn on "Developer mode",
-     click "Load unpacked", and select the folder that opened
-     (%LOCALAPPDATA%\AgentShield\extension).
-  3. In the portal, Connect browser > "Generate activation code"
+  From the zip on the portal's Download page:
+  1. A zip cannot be installed by double-clicking it. Extract it to a
+     folder you keep.
+  2. chrome://extensions (or edge://extensions) > "Developer mode" on >
+     "Load unpacked" > choose that folder.
+  (Quick-Install.bat does the same from the "extension" folder next to it:
+   it copies it to %LOCALAPPDATA%\AgentShield\extension and opens the
+   extensions page.)
+  The Download page shows the zip's SHA-256; check it with:
+     certutil -hashfile <zip file> SHA256
+
+CONNECT
+  1. In the portal, Connect browser > "Generate activation code"
      (single-use, valid 30 minutes, starts with ASA1.).
-  4. Click the AgentShield toolbar icon, paste the code in the
-     "Activation code" box and click "Connect and verify".
-
-IF YOU HAVE A ZIP FROM THE PORTAL'S DOWNLOAD PAGE:
-  A zip cannot be installed by double-clicking it. Extract it to a
-  folder you keep, then chrome://extensions (or edge://extensions) >
-  "Developer mode" on > "Load unpacked" > choose that folder. Then do
-  steps 3 and 4. The Download page shows the zip's SHA-256; check it
-  with:  certutil -hashfile <zip file> SHA256
+  2. Click the AgentShield toolbar icon, paste the code and click
+     "Connect and verify". Each browser connects with its own code.
 
 IF THE POPUP SAYS "Your plan has ended" (or checks / credits used up,
 or your monthly limit reached):
   AI sites are blocked until the plan is renewed, credits are bought
   or the limit is raised in the portal (employees: your admin does
-  this). The browser then reconnects by itself within 5 minutes (or
-  click "Check again"). No reinstall and no new code needed.
+  this). The browser then reconnects by itself within about a minute
+  (or click "Check again"). No reinstall and no new code needed.
 
 FOR IT (users cannot remove it):
-  AgentShield-System-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-    /SERVER=https://agentshield.company.com  [/DASHBOARD=https://...]
-    [/CODE=ASA1....]
-  (or scripts\enterprise\Set-AgentShieldPolicy.ps1 -ApiUrl <server>).
-  This installs the extension and the AgentShield app and sets the
-  server address; every Windows user still connects with their own
-  account (Connect AgentShield, or /CODE= for the installing user).
-  See DEPLOYMENT.md.
+  Force-install with Chrome / Edge enterprise policy (Group Policy,
+  Intune or any MDM): ExtensionInstallForcelist = the value on the
+  portal's Deployment page, and the extension policy apiUrl = your
+  server. Or run, as administrator:
+    powershell -ExecutionPolicy Bypass -File scripts\system-installer\Install-AgentShield.ps1 -ServerUrl https://agentshield.company.com
+  Every user still connects their own browser. See DEPLOYMENT.md.
 
-BUILDING THE SETUP (developers):
-  powershell -File scripts\helper\build-helper.ps1
-  ISCC.exe scripts\system-installer\AgentShield-System-Setup.iss
-  For the public build add /DDefaultServer=https://api... and
-  /DDefaultDashboard=https://app... so nobody is asked for addresses.
-
-NOTE: the old per-user AgentShield-Setup.exe and AgentShield-Client-v1.0.0.zip
-builds (which asked for an enrollment code, no longer used) were removed.
-Rebuild them from scripts\installer.py / scripts\installer.iss if ever needed.
+This folder: package\ = the built extension (zip and CRX, made by
+node scripts\packaging\pack-extension.js); AgentShield-Agent.exe = the
+optional Network Agent (other browsers and desktop AI apps, see
+agent\README.md). The AgentShield Windows app and AgentShield-System-
+Setup.exe were retired in 2.6: the extension no longer needs any .exe.
 
 Full guide for individuals and employees: USER_SETUP.md
 ========================================================================

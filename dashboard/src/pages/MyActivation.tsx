@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, CheckCircle2, Copy, Download as DownloadIcon, KeyRound, Laptop, LogOut, Monitor, Plus, Timer, Zap } from 'lucide-react';
+import { Check, CheckCircle2, Copy, KeyRound, Laptop, LogOut, Monitor, Plus, Timer } from 'lucide-react';
 import { SectionHeader } from '../components/SectionHeader';
 import { api } from '../services/api';
-import { ActivationTokenCreated, AuthorizedDevice, ConnectedComputer, DistributionInfo, Entitlement } from '../types';
+import { ActivationTokenCreated, AuthorizedDevice, ConnectedComputer, Entitlement } from '../types';
 import { NavTab } from '../components/Sidebar';
 import { ACCESS_STATES } from '../utils/format';
-import { isWindowsVisitor } from '../utils/platform';
 
 /**
  * Activation code = "ASA1." + base64url(JSON {u: server URL, t: single-use activation token}).
@@ -42,11 +41,8 @@ export const MyActivation: React.FC<{ email: string; entitlement?: Entitlement |
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
+  // PCs connected earlier through the retired AgentShield Windows app (listed only so they can be removed)
   const [computers, setComputers] = useState<ConnectedComputer[]>([]);
-  const [info, setInfo] = useState<DistributionInfo | null>(null);
-  // "Connect this PC" was clicked: the code was handed to the AgentShield app through agentshield://
-  const [pcLinkSent, setPcLinkSent] = useState(false);
-  const [downloading, setDownloading] = useState(false);
 
   const loadDevices = () => {
     api.getMyDevices().then(setDevices).catch((e) => setError(e.message));
@@ -55,44 +51,14 @@ export const MyActivation: React.FC<{ email: string; entitlement?: Entitlement |
 
   useEffect(() => {
     loadDevices();
-    api.getDistributionInfo().then(setInfo).catch(() => setInfo(null));
     const t = setInterval(() => setNow(Date.now()), 1000);
-    // Follow the PC connection while this page is open (the app connects the browsers within a minute)
+    // Follow the browser connection while this page is open
     const poll = setInterval(loadDevices, 10000);
     return () => {
       clearInterval(t);
       clearInterval(poll);
     };
   }, []);
-
-  /** One click: a fresh code goes straight to the AgentShield Windows app, which asks before connecting. */
-  const connectThisPc = async () => {
-    setError('');
-    setBusy(true);
-    try {
-      const token = await api.createActivationToken();
-      setCreated(token);
-      setCopied(false);
-      setPcLinkSent(true);
-      window.location.href = `agentshield://connect?code=${encodeURIComponent(makeActivationCode(token.api_url, token.token))}`;
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const downloadSetup = async () => {
-    setError('');
-    setDownloading(true);
-    try {
-      await api.downloadFile('AgentShield-System-Setup.exe');
-    } catch (e: any) {
-      setError(e.message || 'Could not start the download.');
-    } finally {
-      setTimeout(() => setDownloading(false), 1500);
-    }
-  };
 
   const removePc = async (pc: ConnectedComputer) => {
     if (!window.confirm(`Remove ${pc.name || 'this PC'}? All its browsers are signed out and AI tools are blocked there until the PC is connected again.`)) return;
@@ -143,52 +109,16 @@ export const MyActivation: React.FC<{ email: string; entitlement?: Entitlement |
 
   // Browsers of a connected PC are listed under that PC
   const liveDevices = devices.filter((d) => d.status !== 'REVOKED' && !d.computer_id);
-  const setupAvailable = Boolean(info?.downloads?.system_setup);
 
-  // One way first, matching the visitor's computer: the Windows app on Windows (when published),
-  // the extension and an activation code elsewhere. The other way stays under "Other ways to connect".
-  const windowsFirst = isWindowsVisitor() && setupAvailable;
-  const windowsWay = (
+  // The extension no longer uses the AgentShield Windows app: every browser connects with its own code.
+  // PCs connected through the app before are still listed, so their device slots can be freed.
+  const windowsWay = computers.length > 0 && (
     <>
-  {/* Windows: one setup and one click for every browser on the PC */}
   <section className="glass-panel" style={{ padding: '24px' }}>
-    <SectionHeader icon={<Zap size={18} />} title="Windows: connect every browser on this PC at once" right={<span className="chip">Recommended</span>}>
-      AgentShield for Windows adds the extension to Chrome, Edge and Brave and connects all of them with one click.
-      The PC uses one device of your plan, however many browsers it has.
+    <SectionHeader icon={<Laptop size={18} />} title="PCs connected with the old Windows app">
+      The AgentShield extension no longer needs the Windows app. Connect each browser with an activation code instead, then
+      remove these PCs to free their device slots.
     </SectionHeader>
-    <ol className="steps" style={{ marginLeft: 18 }}>
-      <li>
-        <strong>Install AgentShield for Windows</strong> (once per PC; Windows asks for permission).{' '}
-        {setupAvailable ? (
-          <button type="button" className="link-btn" disabled={downloading || !licensed} onClick={downloadSetup}>
-            {downloading ? 'Starting download...' : 'Download AgentShield-System-Setup.exe'}
-          </button>
-        ) : (
-          <span className="cell-sub">The Windows setup is not published on this server yet.</span>
-        )}
-      </li>
-      <li>
-        <strong>Connect this PC:</strong> click the button below, then <strong>Open AgentShield</strong> and <strong>Connect</strong>.
-        Every browser on the PC connects by itself within a minute.
-      </li>
-    </ol>
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-      <button type="button" className="btn-primary" onClick={connectThisPc} disabled={busy || !licensed}>
-        <Laptop size={16} /> Connect this PC
-      </button>
-      {setupAvailable && (
-        <button type="button" className="btn-secondary" onClick={downloadSetup} disabled={downloading || !licensed}>
-          <DownloadIcon size={15} /> Download for Windows
-        </button>
-      )}
-    </div>
-    {pcLinkSent && created && !expired && (
-      <div className="callout" style={{ marginTop: 14, display: 'block' }}>
-        Your browser should ask to <strong>open AgentShield</strong>. Nothing happened? Install AgentShield for Windows first,
-        or open <strong>Connect AgentShield</strong> from the Start menu and paste the code shown below.
-      </div>
-    )}
-
     {computers.length > 0 && (
       <div className="table-wrap" style={{ marginTop: 16 }}>
         <table className="data-table">
@@ -239,14 +169,14 @@ export const MyActivation: React.FC<{ email: string; entitlement?: Entitlement |
     <>
   <section className="glass-panel" style={{ padding: '24px' }}>
     <SectionHeader icon={<KeyRound size={18} />} title="Activation code">
-      For one browser (any computer), or to paste into the AgentShield app on Windows. Paste it into the AgentShield
-      extension to connect that browser to your account ({email}). A code works once and expires after 30 minutes.
+      Needed to connect: paste it into the AgentShield extension (Chrome or Edge, any computer). It connects that browser
+      to your account ({email}), works once and expires after 30 minutes.
       Do not share it: whoever uses it first connects to your account. Generating a new code cancels the previous one.
     </SectionHeader>
 
     {licensed && (entitlement?.state === 'FREE_ACTIVE' || entitlement?.state === 'FREE_PAUSED') && (
       <div className="cell-sub" style={{ marginBottom: 10 }}>
-        Free plan · {entitlement.devices_used} of {entitlement.device_limit} device{entitlement.device_limit === 1 ? '' : 's'} in use (a PC with the Windows app counts once)
+        Free plan · {entitlement.devices_used} of {entitlement.device_limit} device{entitlement.device_limit === 1 ? '' : 's'} in use
         {entitlement.state === 'FREE_PAUSED' ? ' · prompt checks paused until the monthly reset' : ''}
       </div>
     )}
@@ -295,8 +225,8 @@ export const MyActivation: React.FC<{ email: string; entitlement?: Entitlement |
                   </button>
                 </div>
                 <ol className="steps">
-                  <li>In Chrome or Edge, click the <strong>AgentShield</strong> icon in the toolbar (or open <strong>Connect AgentShield</strong> on Windows).</li>
-                  <li>Paste this code and click <strong>Connect and verify</strong> (in the Windows app: <strong>Connect</strong>).</li>
+                  <li><strong>Windows setup:</strong> paste it on the <strong>Paste your activation code</strong> page. <strong>Extension (.zip):</strong> click the <strong>AgentShield</strong> icon in the toolbar.</li>
+                  <li>Paste this code and continue (in the extension: <strong>Connect and verify</strong>).</li>
                   <li>The browser (or every browser on the PC) is connected to <strong>{email}</strong> and AI tools unlock.</li>
                 </ol>
               </>
@@ -335,12 +265,9 @@ export const MyActivation: React.FC<{ email: string; entitlement?: Entitlement |
     </div>
   )}
 
-      {windowsFirst ? windowsWay : codeWay}
-
-      <details className="disclosure other-ways" open={windowsFirst ? Boolean(created) : computers.length > 0}>
-        <summary>{windowsFirst ? 'Other ways to connect: one browser with an activation code' : 'Other ways to connect: AgentShield for Windows (every browser on a PC)'}</summary>
-        {windowsFirst ? codeWay : windowsWay}
-      </details>
+      {/* The code is needed for both ways (pasted into the Windows setup or into the extension), so it comes first */}
+      {codeWay}
+      {windowsWay}
 
       <section className="glass-panel" style={{ padding: '24px' }}>
         <SectionHeader icon={<Monitor size={18} />} title="My browsers">

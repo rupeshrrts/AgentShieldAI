@@ -29,6 +29,7 @@ from app.api.schemas import (
 from app.core.audit import record_admin_action, snapshot
 from app.core.catalog import KNOWN_AI_DOMAINS, PRESETS, RULE_CATALOG, RULE_IDS
 from app.core.entitlements import current_entitlement
+from app.core.policy_revision import bump_policy_revision, current_policy_revision
 from app.db.models import Organization, Policy, User
 from app.db.seed import ensure_catalog_policies
 from app.db.session import get_db
@@ -51,6 +52,12 @@ def list_policies(
     This is the single sync call the browser extension makes, authenticated with its device key.
     """
     org_id = principal.organization_id
+    # Every catalog rule gets a row, so each one can be switched on or off in the dashboard. A rule added
+    # to the catalog after this organization was created gets its row here.
+    if ensure_catalog_policies(db, org_id):
+        bump_policy_revision(db, org_id)
+        db.commit()
+
     query = db.query(Policy).filter(Policy.organization_id == org_id)
     if site:
         query = query.filter((Policy.site_scope == "*") | (Policy.site_scope == site))
@@ -68,6 +75,7 @@ def list_policies(
         organization_id=org_id,
         organization_name=org.name if org else None,
         policy_version=max_version,
+        policy_revision=current_policy_revision(db, org_id),
         last_synced_at=datetime.now(timezone.utc),
         policies=policies,
         keywords=get_org_keywords(db, org_id),
@@ -81,6 +89,12 @@ def list_policies(
         ai_domains=KNOWN_AI_DOMAINS,
         entitlement=current_entitlement(db, org_id).as_dict(),
     )
+
+
+@router.get("/revision")
+def policy_revision(principal: Principal = Depends(get_principal), db: Session = Depends(get_db)):
+    """Cheap change check for browsers: they download the full sync only when the revision differs from theirs."""
+    return {"revision": current_policy_revision(db, principal.organization_id)}
 
 
 @router.get("/catalog", response_model=List[RuleCatalogItem])
@@ -131,6 +145,7 @@ def create_policy(
         updated_at=datetime.now(timezone.utc),
     )
     db.add(policy)
+    bump_policy_revision(db, admin_user.organization_id)
     db.commit()
     db.refresh(policy)
     record_admin_action(
@@ -170,6 +185,7 @@ def update_policy(
     policy.updated_by = admin_user.email
     policy.updated_at = datetime.now(timezone.utc)
 
+    bump_policy_revision(db, admin_user.organization_id)
     db.commit()
     db.refresh(policy)
     record_admin_action(
@@ -207,6 +223,7 @@ def delete_policy(
 
     before = snapshot(policy, _POLICY_FIELDS)
     db.delete(policy)
+    bump_policy_revision(db, admin_user.organization_id)
     db.commit()
     record_admin_action(
         db, organization_id=admin_user.organization_id, actor=admin_user.email, action="policy.delete",
@@ -237,6 +254,7 @@ def apply_preset(
             policy.version += 1
             policy.updated_by = admin_user.email
             policy.updated_at = datetime.now(timezone.utc)
+    bump_policy_revision(db, org_id)
     db.commit()
     record_admin_action(
         db, organization_id=org_id, actor=admin_user.email, action="policy.preset",

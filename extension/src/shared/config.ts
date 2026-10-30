@@ -17,7 +17,14 @@
  */
 import { ClientConfig } from './types';
 
-export const DEFAULT_API_BASE_URL = 'http://localhost:8000';
+// Store builds set the production addresses at build time (AGENTSHIELD_API_URL / AGENTSHIELD_DASHBOARD_URL,
+// see extension/build.js and scripts/packaging/store-packages.js); development builds use localhost.
+declare const __AGENTSHIELD_DEFAULT_API_URL__: string | undefined;
+declare const __AGENTSHIELD_DEFAULT_DASHBOARD_URL__: string | undefined;
+export const DEFAULT_API_BASE_URL =
+  typeof __AGENTSHIELD_DEFAULT_API_URL__ === 'string' ? __AGENTSHIELD_DEFAULT_API_URL__ : 'http://localhost:8000';
+export const DEFAULT_DASHBOARD_URL =
+  typeof __AGENTSHIELD_DEFAULT_DASHBOARD_URL__ === 'string' ? __AGENTSHIELD_DEFAULT_DASHBOARD_URL__ : '';
 export const EXTENSION_VERSION = chrome.runtime.getManifest().version;
 export const ACTIVATION_PREFIX = 'ASA1.';
 

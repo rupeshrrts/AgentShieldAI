@@ -154,9 +154,9 @@ Each rule has an **action**, a **severity** (for sorting and risk scores) and an
 | Monitor | Nothing visible | Yes |
 | Allow | Nothing visible | No violation (prompt counted only) |
 
-The strictest action of all matching rules wins. Built-in rules cannot be deleted (turn them Off instead). Changes reach browsers within 5 minutes, or immediately when the employee clicks **Sync Policies**. The **Protected Browsers** page shows which browsers have the latest policy version.
+The strictest action of all matching rules wins. A rule that is **Off** is not enforced at all. Built-in rules cannot be deleted (turn them Off instead). Changes reach connected browsers within about a minute, or immediately when the employee clicks **Sync Policies**. Every kind of restriction on one page: [RESTRICTIONS.md](./RESTRICTIONS.md). The **Protected Browsers** page shows which browsers have the latest policy version.
 
-Rules: credentials & keys, emails, phone numbers, payment cards, PAN, Aadhaar, confidential keywords, file uploads.
+Rules: credentials & keys, emails, phone numbers, payment cards, PAN, Aadhaar, confidential keywords, file uploads; since 2.6 also crypto wallet keys, connection strings with passwords, IBAN, Indian bank accounts (IFSC), UPI IDs, passport, voter ID, GSTIN and internal IP addresses (details and defaults: [RESTRICTIONS.md](./RESTRICTIONS.md)).
 
 ## Confidential keywords
 
@@ -174,7 +174,7 @@ Deployment & Settings → Privacy & retention.
 
 | Setting | Default | Effect |
 | :--- | :--- | :--- |
-| Store text of prompts that broke a rule | On | Investigators can see what was blocked/warned (credentials, card and Aadhaar numbers always masked) |
+| Store text of prompts that broke a rule | On | Investigators can see what was blocked/warned (credentials, wallet keys, card, Aadhaar, IBAN, bank account, passport and voter ID numbers always masked) |
 | Store text of all other prompts | Off | When on, every prompt's text is stored. Inform employees first (DPDP Act) |
 | Keep events for N days | 30 | Older events are deleted automatically |
 

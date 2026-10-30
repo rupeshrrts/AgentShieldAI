@@ -25,6 +25,8 @@ ENV/
 build/
 build-installer/
 *.spec
+# ...except the Network Agent build recipe (source, needed to rebuild AgentShield-Agent.exe)
+!agent/packaging/agentshield-agent.spec
 develop-eggs/
 dist/
 downloads/
@@ -65,12 +67,17 @@ extension/_metadata/
 .vercel/
 *.log
 
+# Transfer zips made for moving the project to another PC
+_transfer/
+
 # Docker Local Overrides
 docker-compose.override.yml
 
 # IDE & OS
 .idea/
-.vscode/
+.vscode/*
+# The shared "run everything" task (README: Ctrl+Shift+B)
+!.vscode/tasks.json
 *.swp
 *.swo
 .DS_Store

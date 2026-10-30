@@ -123,7 +123,7 @@ export const Overview: React.FC<OverviewProps> = ({ metrics, endpoints, me, isAd
           title: `${online} of ${total} browsers online`,
           text:
             (endpoints?.outdated_policy ?? 0) > 0
-              ? `${endpoints?.outdated_policy} browser(s) have not picked up the latest policy yet (they sync every 5 minutes).`
+              ? `${endpoints?.outdated_policy} browser(s) have not picked up the latest policy yet (they check for changes every minute).`
               : 'All online browsers have the latest policy.',
         };
   const toneColor = protectionState.tone === 'success' ? 'var(--color-success)' : protectionState.tone === 'danger' ? 'var(--color-danger)' : 'var(--color-warning)';

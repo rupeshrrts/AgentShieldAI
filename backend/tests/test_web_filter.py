@@ -7,7 +7,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.catalog import WEB_CATEGORIES, WEB_CATEGORY_DEFAULTS, effective_safe_search, effective_web_categories
+from app.core.catalog import (
+    WEB_CATEGORIES,
+    WEB_CATEGORY_DEFAULTS,
+    WEB_CATEGORY_GROUPS,
+    WEB_CATEGORY_PRESETS,
+    effective_safe_search,
+    effective_web_categories,
+)
 from app.db.models import AdminAuditLog, UsageDaily
 from app.db.seed import init_db
 from app.db.session import Base, SessionLocal, engine
@@ -48,7 +55,7 @@ def test_category_ids_match_the_extension():
 def test_effective_settings_ignore_bad_stored_values():
     assert effective_web_categories(None) == WEB_CATEGORY_DEFAULTS
     assert effective_web_categories("not json") == WEB_CATEGORY_DEFAULTS
-    assert effective_web_categories('{"adult": "no", "dating": true, "gambling": true}') == {**WEB_CATEGORY_DEFAULTS, "gambling": True}
+    assert effective_web_categories('{"adult": "no", "astrology": true, "gambling": true}') == {**WEB_CATEGORY_DEFAULTS, "gambling": True}
     assert effective_safe_search(None, {"adult": True}) is True
     assert effective_safe_search(None, {"adult": False}) is False
     assert effective_safe_search(False, {"adult": True}) is False
@@ -87,9 +94,45 @@ def test_admin_changes_categories_with_audit_and_sync(client):
         db.close()
 
 
+def test_every_category_has_a_group_and_every_preset_sets_every_category():
+    group_ids = [g["id"] for g in WEB_CATEGORY_GROUPS]
+    assert all(c["group"] in group_ids for c in WEB_CATEGORIES)
+    assert all(any(c["group"] == g for c in WEB_CATEGORIES) for g in group_ids)
+    ids = [c["id"] for c in WEB_CATEGORIES]
+    assert len(ids) == len(set(ids))
+    for preset in WEB_CATEGORY_PRESETS:
+        assert sorted(preset["categories"]) == sorted(ids), preset["id"]
+        assert all(isinstance(v, bool) for v in preset["categories"].values())
+        assert preset["safe_search"] in (True, False, None)
+    kids = next(p for p in WEB_CATEGORY_PRESETS if p["id"] == "kids")
+    for cid in ("adult", "mature", "dating", "gambling", "drugs", "hate", "weapons", "chat", "malware"):
+        assert kids["categories"][cid] is True, cid
+    assert kids["safe_search"] is True
+    assert not any(next(p for p in WEB_CATEGORY_PRESETS if p["id"] == "off")["categories"].values())
+
+
+def test_presets_are_offered_and_apply_through_the_settings_api(client):
+    _org, admin, device = _account(client)
+    settings = client.get("/api/v1/org/settings", headers=admin).json()
+    assert [g["id"] for g in settings["web_category_groups"]] == [g["id"] for g in WEB_CATEGORY_GROUPS]
+    presets = {p["id"]: p for p in settings["web_category_presets"]}
+    assert set(presets) == {"kids", "workplace", "security", "off"}
+    revision = client.get("/api/v1/policies/revision", headers=device).json()["revision"]
+    kids = presets["kids"]
+    res = client.patch("/api/v1/org/settings", headers=admin, json={"web_categories": kids["categories"], "safe_search": True})
+    assert res.status_code == 200, res.text
+    sync = client.get("/api/v1/policies", headers=device).json()
+    assert sync["settings"]["web_categories"] == kids["categories"] and sync["settings"]["safe_search"] is True
+    assert sync["policy_revision"] > revision
+    off = presets["off"]
+    client.patch("/api/v1/org/settings", headers=admin, json={"web_categories": off["categories"], "safe_search": False})
+    sync = client.get("/api/v1/policies", headers=device).json()["settings"]
+    assert not any(sync["web_categories"].values()) and sync["safe_search"] is False
+
+
 def test_unknown_category_is_rejected(client):
     _org, admin, _device = _account(client)
-    res = client.patch("/api/v1/org/settings", headers=admin, json={"web_categories": {"dating": True}})
+    res = client.patch("/api/v1/org/settings", headers=admin, json={"web_categories": {"astrology": True}})
     assert res.status_code == 400
     assert client.patch("/api/v1/org/settings", headers=admin, json={"web_categories": {"adult": "yes"}}).status_code == 422
 

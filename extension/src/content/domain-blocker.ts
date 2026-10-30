@@ -37,6 +37,19 @@ import { DomainLists, decideHost } from '../shared/domains';
 
   if (typeof chrome === 'undefined' || !chrome?.storage?.local) return;
 
+  // A page restored from the back/forward cache makes no network request, so no network rule (website rules,
+  // categories) ran for it: ask the service worker, which checks the tab's real address and blocks it if needed.
+  window.addEventListener('pageshow', (event: PageTransitionEvent) => {
+    if (!event.persisted) return;
+    try {
+      chrome.runtime.sendMessage({ type: 'CHECK_PAGE' }, () => {
+        void chrome.runtime.lastError;
+      });
+    } catch {
+      // Extension reloaded: nothing to ask
+    }
+  });
+
   chrome.storage.local.get(['domain_lists', 'syncState'], (res) => {
     const lists: DomainLists = res?.domain_lists && Array.isArray(res.domain_lists.blocked) ? res.domain_lists : DEFAULT_LISTS;
     const reason = decideHost(host, lists);

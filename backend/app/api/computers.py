@@ -1,7 +1,9 @@
-"""PCs connected through the AgentShield Windows app (2.4): one connection for every browser on a PC.
+"""PCs connected once with a portal code (2.4): the retired AgentShield Windows app, and today the optional
+Network Agent (agent/), which uses the same flow.
 
-The app (scripts/helper/AgentShieldHelper.cs) is installed by AgentShield-System-Setup.exe and registered
-as the browsers' native messaging host. The person connects the PC once:
+Since 2.6 the browser extension no longer talks to the Windows app (no native messaging), and the Windows
+app and its setup .exe were removed from the repository. PCs connected earlier stay listed until removed.
+The flow:
 
 1. POST /api/v1/computer/activate   The app sends a single-use activation code the person generated while
                                     signed in to the portal (pasted into the app, or handed over by the

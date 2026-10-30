@@ -229,14 +229,27 @@ function Install-AgentShieldPolicies {
     $marker = @{ InstalledAt = (Get-Date).ToString('s'); ServerUrl = $server; Version = [string]$info.version }
     # The AgentShield Windows app reads the portal address from here ("Open the portal to get my code")
     if ($dashboard) { $marker['DashboardUrl'] = $dashboard }
-    $selfHostedUsed = $false
+
+    # Chrome and Edge ignore a self-hosted force-install on PCs that are not domain-joined, Entra-joined or
+    # MDM-enrolled. Setup then installs the extension folder and the person adds it with "Load unpacked",
+    # which needs Developer mode, so developer tools are not blocked on such PCs.
+    $selfHostedUsed = @($Browsers | ForEach-Object { if ($_ -eq 'Edge') { $info.edge.source } else { $info.chrome.source } }) -contains 'self_hosted'
+    $needsLoadUnpacked = $false
+    if ($selfHostedUsed -and $machineWide -and -not $ChromeEnrollmentToken) {
+        $state = Get-DeviceManagementState
+        $needsLoadUnpacked = -not ($state.DomainJoined -or $state.EntraJoined -or $state.MdmEnrolled)
+    }
+    $marker['NeedsLoadUnpacked'] = [int]$needsLoadUnpacked
+    $blockDevTools = $BlockDeveloperTools -and -not $needsLoadUnpacked
+    if ($BlockDeveloperTools -and $needsLoadUnpacked) {
+        Write-Log 'Developer tools are NOT blocked: this PC is not managed, so AgentShield is added with "Load unpacked", which needs Developer mode.'
+    }
     $extensionIds = @()
     foreach ($browser in $Browsers) {
         # Brave installs from the Chrome Web Store (or the self-hosted package), like Chrome
         $entry = if ($browser -eq 'Edge') { $info.edge } else { $info.chrome }
         $extensionIds += $entry.id
         if (-not ($entry.id -match '^[a-p]{32}$')) { throw "Server returned an invalid extension ID for $browser." }
-        if ($entry.source -eq 'self_hosted') { $selfHostedUsed = $true }
         $root = $browserRoots[$browser]
 
         Set-ListEntry (Join-Path $root 'ExtensionInstallForcelist') "$($entry.id);$($entry.update_url)" "$($entry.id);"
@@ -260,7 +273,7 @@ function Install-AgentShieldPolicies {
         }
 
         $marker["${browser}ExtensionId"] = $entry.id
-        if ($BlockDeveloperTools) {
+        if ($blockDevTools) {
             Ensure-Key $root
             New-ItemProperty -Path $root -Name 'DeveloperToolsAvailability' -Value 2 -PropertyType DWord -Force | Out-Null
             $marker["${browser}DevToolsSet"] = 1
@@ -286,15 +299,13 @@ function Install-AgentShieldPolicies {
         New-ItemProperty -Path $markerKey -Name $k -Value $marker[$k] -PropertyType $type -Force | Out-Null
     }
 
-    if ($selfHostedUsed -and $machineWide) {
-        $state = Get-DeviceManagementState
-        if (-not ($state.DomainJoined -or $state.EntraJoined -or $state.MdmEnrolled -or $ChromeEnrollmentToken)) {
-            Write-Log ''
-            Write-Log 'WARNING: this PC is not domain-joined, Entra-joined or MDM-enrolled.'
-            Write-Log '  Chrome and Edge ignore self-hosted force-installs on such PCs, so AgentShield will NOT appear.'
-            Write-Log '  Fix: publish to the Chrome Web Store / Edge Add-ons and set the store IDs on the server'
-            Write-Log '  (see DEPLOYMENT.md), then run this installer again. Or join the PC to your domain / Intune.'
-        }
+    if ($needsLoadUnpacked) {
+        Write-Log ''
+        Write-Log 'NOTE: this PC is not domain-joined, Entra-joined or MDM-enrolled.'
+        Write-Log '  Chrome and Edge ignore self-hosted force-installs on such PCs, so AgentShield does not appear by itself.'
+        Write-Log '  The setup wizard installs the extension folder and shows how to add it once per browser with "Load unpacked".'
+        Write-Log '  For a fully automatic install, publish to the Chrome Web Store / Edge Add-ons and set the store IDs'
+        Write-Log '  on the server (see DEPLOYMENT.md), or join the PC to your domain / Intune.'
     }
 
     Write-Log ''

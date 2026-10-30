@@ -26,7 +26,10 @@ def _mask_value(value: str) -> str:
 
 
 # Findings that are never stored in readable form, whatever the privacy settings
-ALWAYS_MASKED_RULES = {"secret.api_key_like", "pii.credit_card", "pii.aadhaar"}
+ALWAYS_MASKED_RULES = {
+    "secret.api_key_like", "pii.credit_card", "pii.aadhaar",
+    "secret.crypto_key", "secret.connection_string", "pii.iban", "pii.bank_account", "pii.passport", "pii.voter_id",
+}
 
 
 def mask_secrets(text: Optional[str]) -> Optional[str]:

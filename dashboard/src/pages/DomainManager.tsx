@@ -228,7 +228,7 @@ export const DomainManager: React.FC<DomainManagerProps> = ({ isAdmin, endpoints
           </div>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             {endpoints && endpoints.total > 0
-              ? `${endpoints.online} of ${endpoints.total} browsers online; changes reach them within 5 minutes.`
+              ? `${endpoints.online} of ${endpoints.total} browsers online; changes reach them within about a minute.`
               : 'No browsers enrolled yet.'}
           </span>
         </div>

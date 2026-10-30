@@ -130,6 +130,8 @@
       margin-bottom: 4px;
     }
     .why p { font-size: 14.5px; color: var(--ink-2); }
+    .why.control { border-left-color: #15803d; background: #f0fdf4; }
+    .why.control .why-title { color: #166534; }
 
     /* Footer */
     .footer {
@@ -214,6 +216,11 @@
       <div class="why">
         <div class="why-title">Why is this blocked?</div>
         <p id="why-blocked">This website is restricted by your organization's security policy.</p>
+      </div>
+
+      <div class="why control" id="control-box">
+        <div class="why-title">Can this be switched off?</div>
+        <p id="control-where">Yes. An administrator can switch this rule Off or On in the AgentShield portal.</p>
       </div>
     </div>
 

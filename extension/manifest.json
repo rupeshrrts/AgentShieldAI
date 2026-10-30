@@ -1,14 +1,13 @@
 {
   "manifest_version": 3,
   "name": "AgentShield - AI Browser Security",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Stops secrets and personal data leaking into AI tools, and blocks dangerous, adult and piracy websites.",
   "permissions": [
     "storage",
     "alarms",
     "tabs",
-    "declarativeNetRequest",
-    "nativeMessaging"
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -24,7 +23,24 @@
       { "id": "cat_gambling", "enabled": false, "path": "rulesets/gambling.json" },
       { "id": "cat_social", "enabled": false, "path": "rulesets/social.json" },
       { "id": "cat_bypass", "enabled": false, "path": "rulesets/bypass.json" },
-      { "id": "cat_streaming", "enabled": false, "path": "rulesets/streaming.json" }
+      { "id": "cat_streaming", "enabled": false, "path": "rulesets/streaming.json" },
+      { "id": "cat_cryptomining", "enabled": false, "path": "rulesets/cryptomining.json" },
+      { "id": "cat_spyware", "enabled": false, "path": "rulesets/spyware.json" },
+      { "id": "cat_hacking", "enabled": false, "path": "rulesets/hacking.json" },
+      { "id": "cat_remote_access", "enabled": false, "path": "rulesets/remote_access.json" },
+      { "id": "cat_dyndns", "enabled": false, "path": "rulesets/dyndns.json" },
+      { "id": "cat_shortener", "enabled": false, "path": "rulesets/shortener.json" },
+      { "id": "cat_filesharing", "enabled": false, "path": "rulesets/filesharing.json" },
+      { "id": "cat_webmail", "enabled": false, "path": "rulesets/webmail.json" },
+      { "id": "cat_mature", "enabled": false, "path": "rulesets/mature.json" },
+      { "id": "cat_dating", "enabled": false, "path": "rulesets/dating.json" },
+      { "id": "cat_drugs", "enabled": false, "path": "rulesets/drugs.json" },
+      { "id": "cat_hate", "enabled": false, "path": "rulesets/hate.json" },
+      { "id": "cat_weapons", "enabled": false, "path": "rulesets/weapons.json" },
+      { "id": "cat_chat", "enabled": false, "path": "rulesets/chat.json" },
+      { "id": "cat_games", "enabled": false, "path": "rulesets/games.json" },
+      { "id": "cat_shopping", "enabled": false, "path": "rulesets/shopping.json" },
+      { "id": "cat_jobsearch", "enabled": false, "path": "rulesets/jobsearch.json" }
     ]
   },
   "background": {
