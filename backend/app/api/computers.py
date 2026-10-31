@@ -1,5 +1,5 @@
-"""PCs connected once with a portal code (2.4): the retired AgentShield Windows app, and today the optional
-Network Agent (agent/), which uses the same flow.
+"""PCs connected once with a portal code (2.4): the retired AgentShield Windows app and the retired Network Agent
+(removed in 2.6.1), which used the same flow.
 
 Since 2.6 the browser extension no longer talks to the Windows app (no native messaging), and the Windows
 app and its setup .exe were removed from the repository. PCs connected earlier stay listed until removed.

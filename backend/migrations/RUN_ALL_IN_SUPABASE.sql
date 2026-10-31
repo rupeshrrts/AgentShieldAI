@@ -5,9 +5,8 @@
 -- Security setting itself the first time it starts. Run this only AFTER the backend has
 -- started once on Render, to apply/verify everything explicitly. Safe to run more than once.
 --
--- Generated from backend/migrations/2026_10_*.sql in their documented order. If you change one
--- of those files, regenerate this one. Do NOT run supabase_schema.sql in production (it seeds
--- demo accounts with published passwords).
+-- The only migration file: the dated sections below were separate files, applied in this order.
+-- Add new changes as a new section at the end (and to _align_schema in backend/app/db/seed.py).
 -- ==============================================================================
 
 -- >>>>>>>>>> 2026_10_production_hardening.sql

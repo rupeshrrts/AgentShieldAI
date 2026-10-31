@@ -87,7 +87,7 @@ const SystemInstallSection: React.FC<{ copy: (t: string, l: string) => void; cop
             </div>
           </div>
           <div style={{ color: 'var(--text-muted)' }}>
-            Details and ready-made policy files: DEPLOYMENT.md. Remove AgentShield by taking it off the force-install list.
+            Details and ready-made policy files: DEPLOY_STEPS.md. Remove AgentShield by taking it off the force-install list.
           </div>
         </div>
       )}

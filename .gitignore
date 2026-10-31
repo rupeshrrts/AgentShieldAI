@@ -25,8 +25,6 @@ ENV/
 build/
 build-installer/
 *.spec
-# ...except the Network Agent build recipe (source, needed to rebuild AgentShield-Agent.exe)
-!agent/packaging/agentshield-agent.spec
 develop-eggs/
 dist/
 downloads/
@@ -70,8 +68,8 @@ extension/_metadata/
 # Transfer zips made for moving the project to another PC
 _transfer/
 
-# Docker Local Overrides
-docker-compose.override.yml
+# Personal AI-assistant settings (local previews)
+.claude/
 
 # IDE & OS
 .idea/

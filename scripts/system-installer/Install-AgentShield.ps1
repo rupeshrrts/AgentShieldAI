@@ -25,7 +25,7 @@
   the Chrome Web Store / Edge Add-ons and set CHROME_STORE_EXTENSION_ID / EDGE_STORE_EXTENSION_ID
   on the server; this script then uses the store copies, which work on any Windows PC.
 
-  Run as Administrator. Equivalent Group Policy / Intune settings are listed in DEPLOYMENT.md.
+  Run as Administrator. Equivalent Group Policy / Intune settings are listed in DEPLOY_STEPS.md.
 
 .EXAMPLE
   .\Install-AgentShield.ps1 -ServerUrl https://agentshield.company.com
@@ -305,7 +305,7 @@ function Install-AgentShieldPolicies {
         Write-Log '  Chrome and Edge ignore self-hosted force-installs on such PCs, so AgentShield does not appear by itself.'
         Write-Log '  The setup wizard installs the extension folder and shows how to add it once per browser with "Load unpacked".'
         Write-Log '  For a fully automatic install, publish to the Chrome Web Store / Edge Add-ons and set the store IDs'
-        Write-Log '  on the server (see DEPLOYMENT.md), or join the PC to your domain / Intune.'
+        Write-Log '  on the server (see DEPLOY_STEPS.md), or join the PC to your domain / Intune.'
     }
 
     Write-Log ''

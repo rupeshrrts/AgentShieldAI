@@ -352,7 +352,7 @@ export interface DistributionInfo {
   zip_sha256?: string | null;
   zip_size?: number | null;
   store_links?: { chrome: string | null; edge: string | null };
-  downloads?: { extension_zip: boolean; network_agent?: boolean };
+  downloads?: { extension_zip: boolean };
 }
 
 // --- Licensing (SaaS) ---

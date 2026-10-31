@@ -72,11 +72,6 @@ class Settings:
         "EXTENSION_PACKAGE_DIR",
         str(Path(__file__).resolve().parent.parent.parent.parent / "dist-installer" / "package"),
     )
-    # Network Agent installer (one self-installing exe) offered for download; built by agent/packaging
-    AGENT_PACKAGE_PATH: str = os.getenv(
-        "AGENT_PACKAGE_PATH",
-        str(Path(__file__).resolve().parent.parent.parent.parent / "dist-installer" / "AgentShield-Agent.exe"),
-    )
     # Public base URL browsers use to reach this server (e.g. https://agentshield.company.com).
     # If empty, it is taken from the incoming request.
     PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")

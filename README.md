@@ -6,15 +6,13 @@ This README is the single entry point for people **and AI coding agents**. Read 
 
 | Document | For |
 | :--- | :--- |
-| **[INSTALL.md](./INSTALL.md)** | **Start here: server setup, configuration, download from the portal, install on PCs** |
-| [USER_SETUP.md](./USER_SETUP.md) | Individuals and employees: sign up, start a plan, install, connect, understand alerts |
-| [RESTRICTIONS.md](./RESTRICTIONS.md) | Administrators: every kind of restriction, what it blocks and allows, defaults, and which wins |
+| **[DEPLOY_STEPS.md](./DEPLOY_STEPS.md)** | **IT, start here: put it online and run it (GitHub → Render backend with `render.yaml` → Vercel portal, website, console), configuration, extension distribution, operations** |
+| [User setup](#user-setup) (this page) | Individuals and employees: sign up, start a plan, install, connect, understand alerts |
+| [What is blocked and allowed](#what-is-blocked-and-allowed) (this page) | Administrators: every kind of restriction, what it blocks and allows, defaults, and which wins |
 | [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) | Administrators: rules, websites, keywords, investigations; AgentShieldAI staff: internal admin console |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | IT: development, demo, staging, production, extension distribution |
-| [DEPLOY_STEPS.md](./DEPLOY_STEPS.md) | Put it online without a domain: GitHub → Render (backend, `render.yaml`) → Vercel (portal, website, console) |
 | [SECURITY_ARCHITECTURE.md](./SECURITY_ARCHITECTURE.md) | Reviewers: trust boundaries, enforcement, limitations |
 | [DATA_HANDLING.md](./DATA_HANDLING.md) | Privacy / DPDP: what is collected, stored, sent, retained |
-| [TESTING.md](./TESTING.md) | Test commands, results, manual scenarios, demo script |
+| [Testing](#testing) (this page) | Test commands, results, manual scenarios, demo script |
 | [STORE_SUBMISSION.md](./STORE_SUBMISSION.md) | Chrome Web Store / Edge Add-ons: build the packages, listing, permission justifications, privacy disclosures |
 | [AGENTS.md](./AGENTS.md) | Rules for AI coding agents |
 
@@ -24,19 +22,22 @@ This README is the single entry point for people **and AI coding agents**. Read 
 
 1. [Features](#features)
 2. [Customer journey (individual accounts)](#customer-journey-individual-accounts)
-3. [Quick start (one PC, 10 minutes)](#quick-start-one-pc-10-minutes)
-4. [How it works](#how-it-works)
-5. [Repository layout](#repository-layout)
-6. [Authentication model](#authentication-model)
-7. [Backend](#backend)
-8. [Browser extension](#browser-extension)
-9. [Dashboard](#dashboard)
-10. [Internal admin console](#internal-admin-console)
-11. [Detection rules](#detection-rules)
-12. [Configuration](#configuration)
-13. [For AI agents and contributors](#for-ai-agents-and-contributors)
-14. [Known limitations](#known-limitations)
-15. [Change history](#change-history)
+3. [User setup](#user-setup)
+4. [Quick start (one PC, 10 minutes)](#quick-start-one-pc-10-minutes)
+5. [How it works](#how-it-works)
+6. [Repository layout](#repository-layout)
+7. [Authentication model](#authentication-model)
+8. [Backend](#backend)
+9. [Browser extension](#browser-extension)
+10. [Dashboard](#dashboard)
+11. [Internal admin console](#internal-admin-console)
+12. [Detection rules](#detection-rules)
+13. [What is blocked and allowed](#what-is-blocked-and-allowed)
+14. [Configuration](#configuration)
+15. [For AI agents and contributors](#for-ai-agents-and-contributors)
+16. [Testing](#testing)
+17. [Known limitations](#known-limitations)
+18. [Change history](#change-history)
 
 ---
 
@@ -69,28 +70,141 @@ This README is the single entry point for people **and AI coding agents**. Read 
 | Paste and drop check on AI sites (2.6): text pasted or dropped into the prompt box is checked at once; data an enabled Block rule covers never reaches the box | Implemented, real-browser-tested. Copying itself and pasting outside AI sites are not monitored |
 | Page-level website blocking (2.6): open tabs are re-checked when a rule or category is switched On; back/forward-cache pages are re-checked | Implemented; the open-tab case is real-browser-tested, the back/forward case is not automated |
 | 9 more data-protection rules (2.6): crypto wallet keys, connection strings, IBAN, Indian bank account/IFSC, UPI, passport, voter ID, GSTIN, internal IPs | Implemented in both detectors, shared cases, real-browser-tested On/Off |
-| Full browser end-to-end test run on a real PC | Automated real-browser run (Edge 156, headless) for activation and every dashboard switch (2.6); a manual run on a clean PC is still open (see TESTING.md) |
-| Network Agent (2.5): free self-hosted local proxy covering every browser (incl. Firefox) and desktop AI apps; AI domains only; reuses the backend detector/evaluator | Implemented, unit- and integration-tested (`agent/tests`, 23 tests); **not yet run as a packaged Windows service on a real PC** |
-| SSO, Safari, PDF content inspection, ML detection | Not implemented |
+| Full browser end-to-end test run on a real PC | Automated real-browser run (Edge 156, headless) for activation and every dashboard switch (2.6); a manual run on a clean PC is still open (see [Testing](#testing)) |
+| SSO, Firefox, Safari, desktop AI apps, PDF content inspection, ML detection | Not implemented (the Network Agent added in 2.5 for Firefox and desktop AI apps was removed in 2.6.1) |
 
 ## Customer journey (individual accounts)
 
-Since 2.1.0 the public product is the **Individual** account; **Company** workspaces are shown as "Coming soon" (existing company tenants keep their company features). Everything happens in one portal with one sign-in (details for the person: [USER_SETUP.md](./USER_SETUP.md)):
+Since 2.1.0 the public product is the **Individual** account; **Company** workspaces are shown as "Coming soon" (existing company tenants keep their company features). Everything happens in one portal with one sign-in (details for the person: [User setup](#user-setup)):
 
 1. **Sign up** on the portal's sign-in page → **Create an account** → **Individual** (name optional, email, password). You are signed in at once.
-2. **Confirm your email** from the emailed link (`#verify=…`). Needed before the free trial; a banner offers **Send a new link**.
-3. **Start a plan** on **Account & plan**: the free 30-day trial, a monthly / 6-month / annual plan, or prepaid **credits** (pay as you go), paid in Razorpay's hosted Checkout.
-4. **Download.** Add the AgentShield extension to Chrome or Edge (store link, or the zip with Load unpacked until it is published). No Windows program is needed (2.6). The optional Network Agent (`AgentShield-Agent.exe`, 2.5) is offered separately for browsers the extension cannot cover.
+2. **Confirm your email** only when the server sets `EMAIL_VERIFICATION_REQUIRED=true` (off by default since 2.4.1): the emailed link (`#verify=…`) is then needed before the Free plan and the trial, and a banner offers **Send a new link**. The invite-a-friend bonus always needs a confirmed email.
+3. **Start a plan** on **Account & plan** (until then every other portal page is locked): **Start free** (the 30-day trial while it can still be claimed, then the Free plan; otherwise the Free plan straight away), a monthly / 6-month / annual plan, or prepaid **credits** (pay as you go), paid in Razorpay's hosted Checkout.
+4. **Download.** Add the AgentShield extension to Chrome or Edge (store link, or the zip with Load unpacked until it is published). No Windows program is needed or offered (the setup `.exe` was removed in 2.6, the Network Agent in 2.6.1).
 5. **Connect.** **Connect browser → Generate activation code** (single-use, 30 minutes) → paste it into the extension → **Connect and verify**. AI sites are now protected. Each browser connects with its own code.
 6. **Manage everything in the same portal:** usage and credits, security alerts, protection rules and website controls, connected browsers, personal API tokens, profile and password.
 
-**Free forever (2.3):** once the email is confirmed, an individual account without a live plan is on the **Free plan**: 300 prompt checks per UTC month on 1 browser (staff can change both). When they are used up, AI sites stay usable and website controls keep working, but prompt checks pause ("Protection paused") until the 1st, an upgrade or credits. When a trial or plan ends, individuals move to the Free plan instead of being locked. **Invite friends:** the Account page has an invite link (`/#ref=<code>`); when a friend signs up with it and confirms their email, both accounts get 100 bonus prompt checks (credits), for up to 10 friends.
+**Free forever (2.3):** an individual account that chose the Free plan, or whose trial or paid plan ended, is on the **Free plan** (with `EMAIL_VERIFICATION_REQUIRED=true` only after the email is confirmed): 300 prompt checks per UTC month on 1 browser (staff can change both). When they are used up, AI sites stay usable and website controls keep working, but prompt checks pause ("Protection paused") until the 1st, an upgrade or credits. When a trial or plan ends, individuals move to the Free plan instead of being locked. **Invite friends:** the Account page has an invite link (`/#ref=<code>`); when a friend signs up with it and confirms their email, both accounts get 100 bonus prompt checks (credits), for up to 10 friends.
 
 For company workspaces (and individuals without a confirmed email): when the trial or plan ends, the plan's included monthly prompt checks or the credits run out, or the person's own monthly limit is reached, every browser of the account **locks automatically at its next request** (AI sites blocked) and **unlocks by itself** after renewal, a top-up or a higher limit, without reinstalling or a new code.
 
+## User setup
+
+*For individuals and employees.* AgentShield checks what you send to AI tools such as ChatGPT, so customer data, passwords and confidential information don't leak by accident. It works inside your browser and takes about **5 minutes** to set up.
+
+You need: **Google Chrome or Microsoft Edge** (version 110 or newer), and the **address of the AgentShield portal** (the AgentShield website, or from your company's IT if your company runs its own).
+
+> **Until you activate it, AI sites are blocked.** In a browser where AgentShield is installed but not yet activated, ChatGPT, Claude, Gemini, Copilot, Perplexity, DeepSeek, Mistral, Poe, Meta AI, Grok, AI Studio and OpenAI show an **Activation Required** page. This is expected: follow the steps below.
+>
+> **On company PCs, IT may already have installed AgentShield** in Chrome and Edge through browser policy. Then skip step 3 and just sign in and activate.
+
+**The whole journey (individual account):** sign up → **Start free** (or buy a plan or credits) → download the extension → **Connect browser** in the portal and generate an activation code → paste it into the extension → protected. Everything else (usage, credits, alerts, browsers, API tokens, profile) is managed in the same portal with the same sign-in.
+
+### 1. Create your account
+
+**For yourself (Individual account):**
+
+1. Open the AgentShield portal and click **Create an account** (on the website: **Sign up free**).
+2. Choose **Individual** (*Available now*). **Company** shows *Coming soon*: company workspaces with employees and central billing are not open for sign-up yet.
+3. Enter **Your name** (optional), **Email**, **Choose a password** (at least 12 characters) and **Confirm password**, then click **Create account**. You are signed in straight away.
+4. **Email confirmation** is not needed by default. If the portal shows a "Confirm your email" banner, this server requires it: open the link we emailed you (it works once and expires after 24 hours; **Send a new link** sends another) before starting a plan with **Start free**. To earn the invite-a-friend bonus you always need a confirmed email (**Profile & security → Send confirmation link**).
+
+If **Create an account** is not shown, or your email is refused, the server only allows invited accounts or certain email domains, the address is a temporary mailbox, or it cannot receive email (a typo such as `gmial.com` gets a "did you mean …" suggestion).
+
+**If your company sent you an invite email (employees of an existing company workspace):** click the link in it (it works once and expires after 72 hours; ask IT to resend it if it has expired), choose a password of at least 12 characters and confirm. Your account is now created in your company, and your company's plan covers you: skip step 2.
+
+> **Employees: do not click "Create an account".** That creates a separate, **individual** account. It does not join your employer's company, and you would not get its rules or access. If you have no invite, ask IT.
+
+Keep your password private: you need it to sign in to the portal and generate activation codes. Forgot it? Click **Forgot password?** on the sign-in page; a link valid for 60 minutes is emailed to you, and setting a new password signs you out everywhere.
+
+### 2. Start a plan
+
+Until you choose a plan, only **Account & plan** and **Profile & security** open; the other pages say "Choose a plan to get started". On **Account & plan** choose one:
+
+* **Start free** — starts the **30-day full trial** (every feature, once per person) while you can still claim it; when it ends you move to the **Free plan** (free forever: a monthly number of prompt checks on 1 browser, shown on the Free card; 300 by default). If the trial was already used for your email or network, **Start free** starts the Free plan directly, and the trial may be offered later as **Try every feature for 30 days**.
+* **Buy a plan** — monthly (**Subscribe**, renews automatically until you cancel), 6-month or annual (**Buy**, one payment). You pay in Razorpay's secure window (card, UPI, net banking); AgentShield never sees your card or UPI details. The plan starts as soon as the payment is confirmed and you get a receipt under **Billing**. A plan may include a number of prompt checks per month (shown on the plan).
+* **Buy credits** — prepaid prompt checks (pay as you go, e.g. 1,000 checks). Credits never expire. Without a plan, credits alone keep you protected; with a plan, they are used once the plan's monthly checks are used up.
+
+A **prompt check** is one prompt that AgentShield inspected on an AI site in your activated browser (allowed prompts count too; blocked websites and file uploads don't). **Usage & credits** shows how many you used this month (calendar month, UTC), your credits and their history, and lets you set **your own monthly limit** so you never use more than you want. On the Free plan, when the month's checks are used up, AI sites stay usable and website controls keep working, but prompts are not checked ("Protection paused") until the 1st of the month, an upgrade or credits.
+
+**Invite friends:** **Account & plan** has your invite link. When a friend signs up with it and confirms their email, you both get 100 bonus prompt checks (up to 10 friends).
+
+### 3. Install the extension
+
+No Windows program is needed. In the portal open **Download** (it unlocks once you have a plan) and pick the **Google Chrome** or **Microsoft Edge** tab:
+
+* **Store link shown:** click it, then **Add to Chrome** (in Edge: **Get**) and confirm.
+* **Otherwise, the zip (`agentshield-extension.zip`):** a zip cannot be installed by double-clicking it. Extract it to a folder you will keep (e.g. `C:\AgentShield\extension`), open `chrome://extensions` (Edge: `edge://extensions`), turn on **Developer mode**, click **Load unpacked** and choose that folder. (Optional: the **Download** page shows the zip's SHA-256 and the command to check it.)
+
+Then click the puzzle-piece icon in the toolbar and pin **AgentShield**. Store installs (and installs by IT) update by themselves; a copy added with **Load unpacked** is updated by replacing the folder with the new zip and clicking reload on the extensions page (your connection is kept).
+
+### 4. Activate this browser
+
+Do this once in each browser you use (Chrome and Edge are separate). Each connected browser uses one device of your plan.
+
+1. Sign in to the AgentShield portal with your email and password. Open **Connect browser** (in a company workspace: **My activation**) and click **Generate activation code**. The code starts with `ASA1.`, works once and is valid for 30 minutes. If the button is disabled, there is no active plan or credits yet: the page says why (start one in step 2, or ask your company admin).
+2. In Chrome or Edge, click the AgentShield icon. The **Activation Required** screen opens with three steps: 1 Create an account or sign in, 2 Generate your code, 3 Paste it below.
+3. Paste the code into the **Activation code** box and click **Connect and verify**. The extension does not ask for your email or password.
+4. Wait for the confirmation from the AgentShield server. If your company requires approval for new browsers, the popup says it is waiting for an administrator; AI tools stay blocked until IT approves it.
+
+**Never share your code.** It belongs to your account: whoever pastes it first connects a browser to *your* account. Generate a new one if it expires (a new code cancels the old one).
+
+### 5. Check it works
+
+1. Click the AgentShield icon. You should see **Protected**, **Signed in as** your email, your account's name and a plan card (Free trial or the plan name with days left and end date, the Free plan with its checks left, or **Pay as you go** with the prompt checks left). In the last 7 days of a plan a yellow "ends in N days" banner appears.
+2. Open chatgpt.com. A small "AgentShield Protected" badge appears in the corner.
+3. Optional test: type `password: Test-Only-123` and press Enter. A red **Action blocked** notice should appear, and nothing is sent.
+
+### 6. What the alerts mean
+
+| You see | What happened | What to do |
+| :--- | :--- | :--- |
+| **Activation Required page** | This browser is not activated, its activation was removed, your account is disabled, your plan, included checks or credits ran out, your own monthly limit was reached, or the AgentShield server cannot be reached. | Activate it (step 4). If it was working before, open the popup to see why, check your connection, or look at **Account & plan** and **Usage & credits**. |
+| **Popup: Your plan has ended** (or "checks used up", "limit reached", "credits used up") | The plan expired, this month's included prompt checks or your credits are used up, or you reached your own monthly limit. AI sites are blocked. | Renew, buy credits or raise your limit in the portal (**Choose a plan** opens it; employees: ask your company admin). Your browser stays activated and unlocks by itself within a few minutes, or click **Check again**. No new code and no reinstall needed. |
+| **Popup / badge: Protection paused** | Free plan: this month's free prompt checks are used up. AI sites and website controls keep working, but prompts are not checked. | Wait for the 1st of the month, upgrade or buy credits. |
+| **Red — Action blocked** | The prompt or file contained something that must never go to an AI tool (password, API key, card or Aadhaar number, or something your rules block). Nothing was sent. | **Return and edit**: remove the sensitive part and send again. If a password or key was already shared elsewhere, change it (company: tell IT). |
+| **Amber — Confirmation required** | It may contain personal or sensitive data (email, phone, PAN, a file upload). | Remove it, or click **Send anyway** if it's allowed for your work. Adding a short reason helps whoever reviews the alerts. |
+| **Blue — Masking required** | It contains a confidential term from your keyword list. | Click **Mask and send** to send it with the term replaced by `[REDACTED]`, or edit it yourself. |
+| **"Protection rules loading"** | The browser has just connected and is still downloading your rules; nothing is sent until they are complete. | Wait a moment and send again. |
+| **Website blocked page** | The site (for example an online PDF converter, a blocked category or an unapproved AI tool) is not allowed. | Use an approved tool, or change **Website controls** (company: ask IT to review the site). |
+
+**What is recorded:** your account (and, for employees, your company) receives a record when a rule is triggered: the rule, the site, the time, your account's email and, depending on the privacy settings, the prompt with passwords, keys and card/Aadhaar numbers hidden. Every inspected prompt is also counted for usage (a number per day, without its text). The account can also see which browsers are activated. Your browsing history is not collected. Details: [DATA_HANDLING.md](./DATA_HANDLING.md).
+
+**Managing your account (individuals):** in the same portal: **Security alerts**, **Usage & credits**, **Protection rules**, **Website controls**, **Connect browser** (your browsers), **API connections** (personal read-only tokens for your own tools; each token is shown once), **Profile & security** (name, email confirmation, password, sign out everywhere). **Company workspace** shows *Soon*.
+
+**Leaving a shared or old PC:** click the AgentShield icon → **Sign out this browser**, or sign out that browser from **Connect browser** / **My activation** in the portal.
+
+### 7. Troubleshooting
+
+| Problem | Fix |
+| :--- | :--- |
+| Invite link "expired" or "already used" | Ask IT to resend the invite. |
+| "An account with this email already exists" after **Create account** | You (or someone using your address) already signed up. Sign in, or click **Forgot password?**: the reset link goes to your inbox, so you can take the account over; this also signs out every other session. |
+| "Company accounts are coming soon" | Company workspaces are not open yet. Create an **Individual** account. |
+| Email address refused at sign-up | Use a real, permanent address with no typo; on some servers only certain (work) email domains can sign up, otherwise ask IT for an invite. |
+| Confirmation email not received, or link "invalid, expired or already used" (only when the server requires confirmation) | Check your spam folder, then **Send a new link** (banner or **Profile & security**). Links work once and expire after 24 hours. |
+| **Start free** refused | The page says why (for example email not confirmed yet on a server that requires it, the trial already used for this email, or too many trials from your network). Start the Free plan, or choose a paid plan or credits. |
+| "Invalid email or password" on the portal | Use the email and password of your AgentShield account, or click **Forgot password?**. |
+| Reset link "invalid, expired or already used" | Request a new one with **Forgot password?**; links work once and expire after 60 minutes. |
+| Signed out of the portal | Sign-ins last 12 hours; changing or resetting your password, or **Sign out everywhere**, also signs you out. Sign in again. |
+| "Your plan has ended", or "no licence" / "licence revoked" / "account suspended" in the popup | No active plan. Start or renew one on **Account & plan** (employees: ask your company admin). Once it is restored, click **Check again**; you don't need a new code. |
+| "This month's included prompt checks are used up" | Buy credits (extra checks then use credits) or upgrade; included checks start again on the 1st of next month (UTC). |
+| "Your monthly usage limit is reached" | You set this limit. Raise or remove it in **Usage & credits**. |
+| "Your prepaid credits are used up" | **Buy credits** or choose a plan on **Account & plan**. |
+| "Your plan allows N devices … and all are in use", or "This account already has N browsers or PCs connected" | Sign out a browser you no longer use in **Connect browser** / **My activation**, or move to a plan with more browsers. |
+| "This activation code is not valid" | Copy the whole code (it starts with `ASA1.`), or generate a new one. |
+| Code "expired", "already used" or "replaced" | Generate a new code and use it within 30 minutes. |
+| "Waiting for an administrator to approve this browser" | IT must approve it. AI tools stay blocked until then. |
+| "Cannot reach the AgentShield server" | Check your internet/VPN connection, then click **Retry connection**. AI tools stay blocked until the connection is restored. |
+| AI sites suddenly show **Activation Required** | The browser's activation was revoked, your account disabled, your plan, checks or credits ran out, or the server is unreachable. Check the message in the popup; activate again, click **Check again**, or check **Account & plan**. |
+| Badge shows **Not Protected** on an AI site | The site changed its layout. Reload the page; if it persists, tell IT or AgentShield support. |
+| A normal prompt is flagged by mistake | Choose **Send anyway** for warnings, or adjust **Protection rules** (company: tell IT, including the time). |
+| A website is blocked by mistake | Add it as **Allow** in **Website controls** (company: ask IT). |
+| The AgentShield icon disappeared | It was removed or disabled. Re-install it (step 3), or ask IT. |
+
 ## Quick start (one PC, 10 minutes)
 
-Prerequisites: Python 3.10+, Node.js 18+, Chrome or Edge.
+Prerequisites: Python 3.11+ (3.14 recommended: the same as the Render image), Node.js 18+, Chrome or Edge.
 
 **Fastest way — one command in any terminal (VS Code, Antigravity, cmd, PowerShell):**
 ```
@@ -102,7 +216,7 @@ confirmation links are printed in the same terminal. It always uses a local test
 - First time, create your developer-console login: `npm start -- --owner you@company.com`
 - Start from empty test data: `npm run reset`
 - **Emails are not sent locally** unless `.env` has `SMTP_HOST` and `SMTP_FROM` (plus `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`); confirmation, reset and invite links are then printed in the terminal, highlighted in yellow, and the portal says so (`GET /auth/signup-info` → `email_delivery`). `npm start` reads only the `SMTP_*` lines from `.env`; the database is still the local test file.
-- The browser opens the **website (http://localhost:5172) first**; its Sign up / Log in buttons lead to the user dashboard (:5173). Add `-- --no-open` to skip opening the browser.
+- The browser opens the **website (http://localhost:5172) first**; **Sign up free** and **Log in** lead to the user dashboard (:5173); its sign-in card's **Site owner? Admin login** link opens the developer console (:5175). Add `-- --no-open` to skip opening the browser.
 
 (VS Code users can also press Ctrl+Shift+B.) The manual steps below do the same thing by hand.
 
@@ -158,8 +272,7 @@ STAFF BROWSER: admin-console (own origin) ─ HTTPS + staff ──►│  /inter
 * **File flow:** the upload event is stopped → `file.upload` rule + content scan of text files → allowed uploads are re-dispatched to the page.
 * **Website flow:** `declarativeNetRequest` rules block before load; `domain-blocker.ts` and `tabs.onUpdated` are backups; all use `shared/domains.ts`.
 * **Activation flow:** the worker starts `LOCKED` (AI sites blocked) → the user signs in to the dashboard (or creates an account), generates a single-use code in My activation and pastes it into the popup → the browser's new key pair is registered → each 15-minute session is obtained by signing a server challenge → `AUTHORIZED`; revocation, a disabled account or an unreachable server lock it again (`background/auth-state.ts`, `api/device_auth.py`).
-* **PC flow (Windows app, 2.4; retired from the extension in 2.6):** the extension (1.9.0) no longer has the `nativeMessaging` permission and never talks to the Windows app, so it needs no `.exe`. The server's `/api/v1/computer/*` endpoints remain for the optional Network Agent (`agent/`); PCs connected earlier are listed in **Connect browser** only so they can be removed.
-* **Network Agent flow (optional, 2.5):** a free self-hosted local proxy (`agent/`) for PCs where the extension cannot reach everything (Firefox, other browsers, desktop AI apps). It connects the PC with a portal code through the same `/api/v1/computer` → `/api/v1/device` flow, then **opens only the AI domains** (everything else is tunnelled, never decrypted), extracts the prompt from each AI request and applies the **same detector and policy evaluator as the backend** — Block / Redact / Warn / Monitor / Allow — before the request reaches the site. It is fail-closed and holds one device slot. The extension stays the primary control; the agent is the gap-filler. See [agent/README.md](./agent/README.md).
+* **PC connections (retired):** the Windows app (2.4) was retired in 2.6 and the Network Agent (2.5) removed in 2.6.1; the extension (1.9.0) has no `nativeMessaging` permission and needs no `.exe`. The server's `/api/v1/computer/*` endpoints remain only so PCs connected earlier are listed in **Connect browser** and can be removed.
 * **Sync (2.6):** while authorized: right after sign-in, then **every minute** a cheap check of the organization's revision (`GET /api/v1/policies/revision`; every enforced dashboard change increases it), with a full download only when it changed or at least every 5 minutes, and on "Sync policies". A heartbeat follows each full sync. Open AI tabs get the new rules at once (`POLICIES_UPDATED`).
 * **Enforcement follows the dashboard (2.6):** a protection rule is enforced only by an **enabled** policy row (no built-in default action), a website category only while switched on, Safe Search only while on, unapproved AI sites only while that switch is on, a website rule only while enabled. Until the synced rules contain every catalog rule, prompts and uploads are not sent (fail closed, "Protection rules loading").
 * **Two web apps:** the customer portal (`dashboard/`) serves customer companies only; AgentShieldAI's own staff use the separate internal admin console (`admin-console/`) on its own origin. They use different accounts (`users` vs `staff_users`) and different token types, and neither app's tokens work on the other's APIs.
@@ -175,7 +288,7 @@ backend/app/
   api/api_tokens.py       personal API tokens /api/v1/me/api-tokens; read-only /api/v1/public/alerts and /usage (aspt_ tokens only)
   api/users.py            invites, accounts, authorized browsers (admin); activation codes and own browsers (/api/v1/me)
   api/device_auth.py      /api/v1/device/activate, /challenge, /session, /deactivate (licence checked; codes from a connected PC link the browser to it)
-  api/computers.py        AgentShield Windows app: /api/v1/computer/activate, /challenge, /browser-code, /status, /deactivate (signed by the PC key); /api/v1/me/computers (list, remove)
+  api/computers.py        PC connections (Windows app and Network Agent, both retired; kept so earlier PCs can be listed and removed): /api/v1/computer/activate, /challenge, /browser-code, /status, /deactivate (signed by the PC key); /api/v1/me/computers (list, remove)
   api/billing.py          trial claim, entitlement status, plans, notices, current release
   api/payments.py         Razorpay checkout + confirm, webhook, billing history, receipts, subscription cancel; platform_router = /internal/api/billing/* (orders, webhook log, refund, reconcile)
   api/platform.py         internal console API /internal/api/* (companies/accounts, licences incl. exceptions, credits, usage, users, devices, plans, releases, audit, metrics, health, jobs); one permission per route
@@ -208,7 +321,7 @@ backend/app/
   detection/detector.py   Python detector (mirror of extension detector.ts)
   policies/evaluator.py   Python decision logic (mirror of extension policy.ts)
 backend/tests/            test_api, test_enterprise, test_activation, test_saas, test_billing, test_internal, test_individual (acceptance tests), test_no_hardcoded_secrets (source scan), test_detection (+ detection_cases.json shared with the extension), test_policy; helpers.py; conftest.py (throwaway test-only env values)
-backend/migrations/       SQL for existing Supabase databases (run in order)
+backend/migrations/       RUN_ALL_IN_SUPABASE.sql: every schema change in one file, optional (the backend applies them on start)
 extension/
   manifest.json, managed_schema.json (enterprise policy fields), blocked.html/js, test-bench.html/js
   src/background/service-worker.ts, auth-state.ts (activation state machine)
@@ -220,27 +333,24 @@ dashboard/src/
   App.tsx, services/api.ts, services/razorpayCheckout.ts (loads Razorpay hosted Checkout), types.ts, components/(Navbar, Sidebar, SectionHeader, UserRiskDossier)
   pages/Account, Download, ResetPassword, Overview, SecurityEvents, Endpoints, AuditLog, PolicyEditor, DomainManager, Users, MyActivation, AcceptInvite, VerifyEmail, Deployment, InteractiveSandbox, DemoGuide, Limitations, Login,
         Usage (Usage & credits), ApiTokens (API connections), Profile (Profile & security), CompanyComingSoon (Company workspace)
-website/                  Public marketing website (static React/Vite app, dev port 5172; no API calls). Sign up / Log in link to
-                          the portal at VITE_PORTAL_URL (default http://localhost:5173); Sign up opens `#signup` (sign-up form)
+website/                  Public marketing website (static React/Vite app, dev port 5172; no API calls). Sign up and Log in
+                          link to the portal at VITE_PORTAL_URL (default http://localhost:5173; Sign up opens `#signup`, Log in
+                          `#signin`); staff use the portal sign-in card's "Admin login" link. A Vercel build requires VITE_PORTAL_URL
 admin-console/            Internal admin console (separate React/Vite app, dev port 5175; build output dist/ is generated)
   src/App.tsx (navigation by permission), api.ts (only /internal/*, staff token in sessionStorage), types.ts, ui.tsx, format.ts
   src/pages/SignIn (password, MFA, QR enrolment, recovery codes, invite, forced password change), Overview, Health (Platform health),
             Companies (Accounts), Payments, Plans (Plans & pricing), Releases (Extension releases), Audit (Audit log), Staff (Staff & roles)
-agent/                    AgentShield Network Agent (2.5): free self-hosted local proxy for every browser + desktop AI app
-  agentshield_agent/      config, client (connect/session via /computer+/device), keys (DPAPI), ca (per-PC name-constrained root),
-                          inspect_body (pull/rewrite prompt in AI request bodies), engine (reuses backend detector+evaluator),
-                          proxy (built-in CONNECT + selective TLS interception), agent (session/sync/events), cli
-  mitm/agentshield_addon.py  the same enforcement as a mitmproxy addon
-  tests/                  pytest (real backend in-process + real-socket proxy); README.md (run + GPO/Intune deployment)
 scripts/system-installer/ Install-AgentShield.ps1 (force-installs the extension in Chrome/Edge/Brave through enterprise policy; no .exe)
 scripts/packaging/        new-extension-key.js, pack-extension.js (CRX3 + store zip), verify-crx.js,
                           store-packages.js (Chrome Web Store + Edge Add-ons zips into dist-store/, checked before writing)
-scripts/                  enterprise/Set-AgentShieldPolicy.ps1 (wrapper), deploy & verify
-dist-installer/           Quick-Install.bat (Load unpacked helper), AgentShield-Agent.exe (optional Network Agent), README.txt;
-                          package/ = built zip + CRX (git-ignored; copied to backend/release/package for production)
+scripts/                  verify_production.py, generate_secret_key.py,
+                          test_supabase_connection.py
+dist-installer/package/   Output of pack-extension.js: built zip + CRX + store zip (git-ignored; zip, CRX and release.json
+                          are copied to backend/release/package for production)
+backend/release/          What production serves for download: package/ (extension zip, CRX, release.json)
 keys/                     Extension signing key (PRIVATE, git-ignored, back it up)
 backend/app/api/distribution.py   /extension-updates/ info, updates.xml, .crx
-SUPABASE_SETUP.sql        New Supabase project: schema + RLS + demo seed (the demo accounts have published passwords: local testing only, never production)
+backend/Dockerfile        Backend image (Render builds it from render.yaml)
 ```
 
 ## Authentication model
@@ -250,11 +360,11 @@ SUPABASE_SETUP.sql        New Supabase project: schema + RLS + demo seed (the de
 | Dashboard Admin / Viewer | `Authorization: Bearer <JWT>` (`typ=user`) | Admin: manage own organization. Viewer: read only |
 | Employee | `Authorization: Bearer <JWT>` (`typ=user`, role `EMPLOYEE`) | Only `/auth/*` and `/api/v1/me/*`: generate activation codes, manage own browsers |
 | Browser extension | `Authorization: Bearer <device session JWT>` (`typ=device`, 15 min) | Read rules/domains/keywords/settings, read its own account's status, submit events and heartbeats, sign itself out |
-| AgentShield Windows app (2.4) | No session: each call carries a fresh 60-second challenge (`typ=computer_challenge`) signed with the PC's non-exportable key | Only `/api/v1/computer/browser-code`, `/status`, `/deactivate`: get single-use codes for the PC's own browsers, check or remove its own connection |
+| Connected PC (Windows app or Network Agent, both retired; only PCs connected earlier) | No session: each call carries a fresh 60-second challenge (`typ=computer_challenge`) signed with the PC's non-exportable key | Only `/api/v1/computer/browser-code`, `/status`, `/deactivate`: get single-use codes for the PC, check or remove its own connection |
 | AgentShieldAI staff (internal console) | `Authorization: Bearer <staff JWT>` (`typ=staff`, `STAFF_TOKEN_HOURS`, default 8 h), issued only after password + authenticator code | Only `/internal/*`, each route limited to one permission (table below) |
 | Personal API token (2.1) | `Authorization: Bearer aspt_…` (created by an account admin or viewer in **API connections**; scopes `alerts:read`, `usage:read`; optional expiry) | Only `GET /api/v1/public/alerts` and `/api/v1/public/usage`, read-only, own account only, 60 requests/min; refused (401) everywhere else |
 
-Customer roles today are `ADMIN`, `VIEWER` and `EMPLOYEE` (Phase B will add Company Owner / Security Manager, seats and departments). The former customer role `SUPERADMIN` no longer exists: at startup (and in `2026_10_internal_console.sql`) such accounts become `ADMIN` of their own company, and they no longer open any platform pages.
+Customer roles today are `ADMIN`, `VIEWER` and `EMPLOYEE` (Phase B will add Company Owner / Security Manager, seats and departments). The former customer role `SUPERADMIN` no longer exists: at startup (and in the internal-console section of `RUN_ALL_IN_SUPABASE.sql`) such accounts become `ADMIN` of their own company, and they no longer open any platform pages.
 
 **Account types (2.1).** `organizations.account_type` is `INDIVIDUAL` (public sign-up; one person, who is its `ADMIN`) or `COMPANY` (every tenant created before 2.1, the initial company, and sign-ups only when `COMPANY_SIGNUP_ENABLED=true`). Company-management routes (`/api/v1/org/users`, invites, `/api/v1/org/devices`) depend on `require_company_workspace` and answer individual accounts with 403 `COMPANY_FEATURE_UNAVAILABLE`; their own browsers stay manageable under `/api/v1/me/*`.
 
@@ -298,7 +408,7 @@ Customer roles today are `ADMIN`, `VIEWER` and `EMPLOYEE` (Phase B will add Comp
 
 ## Backend
 
-**Tables:** organizations (+ `suspended_at`; 2.1: `account_type`, `credit_balance`, `monthly_check_cap`), users (+ `email_verified_at`, `session_version`, `display_name`), usage_daily (prompt checks per account, person and UTC day), credit_ledger (every credit change except per-check spending), api_tokens (SHA-256 hashes only), email_verifications (+ `purpose`), plans, licenses, trial_claims, license_adjustments, notifications, extension_releases, user_invites, activation_tokens, devices, policies, security_events (+ `justification`, `client_event_id` UNIQUE per organization), domain_rules, user_governance, device_keys (legacy), restricted_keywords, organization_settings (+ `block_unapproved_ai`, `require_device_approval`), admin_audit_log (+ `actor_type`: customer / staff / system), endpoints; internal console: staff_users, staff_recovery_codes, staff_invites; payments: billing_orders, billing_payments (UNIQUE `provider_payment_id`), billing_subscriptions, webhook_events (UNIQUE `provider_event_id`), plans (+ `razorpay_plan_id`, `razorpay_plan_amount`; 2.1: kind `CREDITS` for credit packs, `credits`, `check_limit`). New tables are created at startup; new columns are added by `_align_schema()` in `seed.py`; Supabase users also run `backend/migrations/*.sql`.
+**Tables:** organizations (+ `suspended_at`; 2.1: `account_type`, `credit_balance`, `monthly_check_cap`), users (+ `email_verified_at`, `session_version`, `display_name`), usage_daily (prompt checks per account, person and UTC day), credit_ledger (every credit change except per-check spending), api_tokens (SHA-256 hashes only), email_verifications (+ `purpose`), plans, licenses, trial_claims, license_adjustments, notifications, extension_releases, user_invites, activation_tokens, devices, policies, security_events (+ `justification`, `client_event_id` UNIQUE per organization), domain_rules, user_governance, device_keys (legacy), restricted_keywords, organization_settings (+ `block_unapproved_ai`, `require_device_approval`), admin_audit_log (+ `actor_type`: customer / staff / system), endpoints; internal console: staff_users, staff_recovery_codes, staff_invites; payments: billing_orders, billing_payments (UNIQUE `provider_payment_id`), billing_subscriptions, webhook_events (UNIQUE `provider_event_id`), plans (+ `razorpay_plan_id`, `razorpay_plan_amount`; 2.1: kind `CREDITS` for credit packs, `credits`, `check_limit`). New tables are created at startup; new columns are added by `_align_schema()` in `seed.py`; on Supabase, `backend/migrations/RUN_ALL_IN_SUPABASE.sql` can optionally apply or verify them explicitly.
 
 **API** (interactive docs: `/docs`):
 
@@ -318,7 +428,7 @@ Customer roles today are `ADMIN`, `VIEWER` and `EMPLOYEE` (Phase B will add Comp
 | `POST /api/v1/me/activation-tokens`, `GET /api/v1/me/devices`, `POST /api/v1/me/devices/{id}/revoke` | Any account | Own activation codes and browsers |
 | `POST /api/v1/device/activate`, `/challenge`, `/session` | none (rate-limited; activation code + key / signature) | Browser activation and sessions |
 | `POST /api/v1/device/deactivate` | Device | "Sign out this browser" |
-| `POST /api/v1/computer/activate` | none (rate-limited; portal activation code + PC public key) | Connect a PC through the Windows app (one device slot; 409 `DEVICE_LIMIT` when full) |
+| `POST /api/v1/computer/activate` | none (rate-limited; portal activation code + PC public key) | Connect a PC (used by the retired Windows app and Network Agent; one device slot; 409 `DEVICE_LIMIT` when full) |
 | `POST /api/v1/computer/challenge`, `/browser-code`, `/status`, `/deactivate` | PC signature (challenge signed with the PC key) | Single-use 5-minute code for one browser on the PC; connection status; disconnect (signs out its browsers) |
 | `GET /api/v1/me/computers`, `POST /api/v1/me/computers/{id}/revoke` | Any account | Own connected PCs with their browsers; remove a PC (all its browsers are signed out) |
 | `GET /api/v1/billing/status`, `GET /api/v1/billing/plans`, `POST /api/v1/billing/notifications/{id}/read` | Any account | Company entitlement, trial eligibility, licences, notices; plans |
@@ -351,7 +461,7 @@ Customer roles today are `ADMIN`, `VIEWER` and `EMPLOYEE` (Phase B will add Comp
 | `POST /internal/api/jobs/run-reminders` | `jobs.run` | Run the reminder job now |
 | `GET /internal/api/billing/orders`, `/webhooks` | `billing.read` | All orders and payments; Razorpay webhook log |
 | `POST /internal/api/billing/payments/{id}/refund`; `POST /internal/api/billing/reconcile` | `billing.refund`; `billing.reconcile` | Refund (reason); re-check recent unpaid one-time orders |
-| `GET /internal/api/staff`, `POST /internal/api/staff/invite`, `PATCH /internal/api/staff/{id}`, `POST …/{id}/reset-mfa`, `POST …/{id}/end-sessions` | `staff.manage` | Staff & roles |
+| `GET /internal/api/staff`, `POST /internal/api/staff/invite`, `PATCH /internal/api/staff/{id}`, `POST …/{id}/reset-password` (returns a one-time temporary password), `POST …/{id}/reset-mfa`, `POST …/{id}/end-sessions` | `staff.manage` | Staff & roles |
 | `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /auth/logout-all` | none / none / any account | Password reset; sign out everywhere |
 | `GET /api/v1/policies` | Operator or device | Sync: policies (every catalog rule, with `enabled`), keywords, settings, ai_domains, `policy_revision` |
 | `GET /api/v1/policies/revision` | Operator or device | `{revision}`: the organization's blocking-configuration revision (browsers check it every minute) |
@@ -414,9 +524,168 @@ Pages (`NavTab` in `components/Sidebar.tsx`): Overview (status + getting started
 
 The catalog is `backend/app/core/catalog.py`. Detection exists twice (Python and TypeScript) and is checked against the same `backend/tests/detection_cases.json`.
 
+## What is blocked and allowed
+
+*For administrators:* every kind of restriction AgentShield applies, what each one blocks, what it lets through, and where it is switched (server 2.6, extension 1.9.0). Sources of truth in the code: `RULE_CATALOG`, `PRESETS`, `WEB_CATEGORIES`, `WEB_CATEGORY_PRESETS` and `KNOWN_AI_DOMAINS` in `backend/app/core/catalog.py`; `DEFAULT_DOMAINS` in `backend/app/db/seed.py`; `extension/src/shared/domains.ts`, `web-categories.json` and `extension/rulesets/`; the decision twins `extension/src/shared/policy.ts` ↔ `backend/app/policies/evaluator.py`.
+
+**The basic rule:** a restriction applies only while it is **On** in the portal. Switch it **Off** and it does nothing. Changes reach connected browsers within about a minute (or at once with **Sync policies** in the extension popup).
+
+There are **6 kinds of restriction**:
+
+| # | Kind | Where it is set | What it acts on |
+| :--- | :--- | :--- | :--- |
+| 1 | Protection rules (data in prompts and files) | Portal → **Protection rules** | Text typed or pasted into an AI site, and files uploaded there |
+| 2 | Website categories (24, in 4 groups) + Safe Search + quick settings (Kids / Workplace / Security / All off) | Portal → **Website controls** → Category blocking | Whole kinds of websites, on every site |
+| 3 | Unapproved AI tools | Portal → **Website controls** → "Block unapproved AI tools" | Known AI websites that are not on your Allowed list |
+| 4 | Your own website rules (Block / Allow) | Portal → **Website controls** → domain list | Any domain you add |
+| 5 | Activation lock | Automatic (not a switch) | AI websites in a browser that is not connected |
+| 6 | Employee status (company workspaces) | Portal → **Users & Devices** / employee profile | One employee's AI use |
+
+### 1. Protection rules (what may be sent to an AI site)
+
+Checked **inside the browser** before anything is sent, only on these AI sites: chatgpt.com, openai.com, claude.ai, gemini.google.com, aistudio.google.com, copilot.microsoft.com, perplexity.ai, deepseek.com, chat.mistral.ai, poe.com, meta.ai, grok.com (`SUPPORTED_AI_HOSTS`). On every other website prompts are not checked.
+
+| Rule | What it detects | Default action |
+| :--- | :--- | :--- |
+| API keys, tokens, passwords & private keys | OpenAI/Anthropic/AWS/GitHub/Google/Slack/Stripe keys, JWTs, PEM private keys, `password: …` | **Block** |
+| Email addresses | Any email address | Warn |
+| Phone numbers | 10+ digit numbers (Indian and North American) | Warn |
+| Payment card numbers | 13–19 digits that pass the Luhn check | **Block** |
+| Indian PAN numbers | ABCDE1234F format | Warn |
+| Aadhaar numbers | 12 digits that pass the Verhoeff check | **Block** |
+| Confidential keywords | Your list (Deployment & Settings → Confidential keywords), whole word, any case | Redact |
+| File uploads to AI sites | Any file attached, dropped or pasted on an AI site | Warn |
+| Crypto wallet private keys | Bitcoin WIF keys, `xprv` extended keys, 64-hex keys written next to "private key"/"seed" | **Block** |
+| Connection strings with passwords | `postgres://user:password@host` and similar (placeholders like `<password>` ignored) | **Block** |
+| IBAN bank account numbers | International account numbers passing the IBAN mod-97 check | **Block** |
+| Indian bank account details | IFSC codes; 9–18 digit numbers written after "account" / "a/c" / "acct" | Warn |
+| UPI IDs | `name@okaxis`, `98xxxxxxxx@ybl`, `name@paytm`… (known UPI handles only, so @mentions don't count) | Warn |
+| Indian passport numbers | Letter + 7 digits, only when "passport" is written shortly before | **Block** |
+| Voter ID (EPIC) numbers | 3 letters + 7 digits, only with "voter" / "EPIC" / "election" shortly before | Warn |
+| GSTIN numbers | 15-character GST IDs passing the GSTIN check character (business IDs: recorded only) | Monitor |
+| Internal IP addresses | 10.x, 172.16–31.x, 192.168.x (reveals the company network: recorded only) | Monitor |
+
+The newer rules follow the way enterprise DLP dictionaries work: a format **plus** a checksum (IBAN, GSTIN, card, Aadhaar) or a nearby keyword (passport, voter ID, account number), so ordinary numbers and codes don't trigger them.
+
+**When text is checked:** when the prompt is sent (Enter, send button, form), and also **the moment text is pasted or dropped into the prompt box**: if an enabled rule set to **Block** matches, the paste is stopped and the text never reaches the box. Warn, Redact and Monitor are applied when the prompt is sent.
+
+**Actions** (you can change the action of each rule):
+
+| Action | What the employee sees | Sent? | Recorded? |
+| :--- | :--- | :--- | :--- |
+| Block | Red dialog | No | Yes |
+| Redact | Preview with `[REDACTED:…]` | Yes, masked (a file with a match is blocked instead) | Yes |
+| Warn | Must confirm and may give a reason | Only if they confirm | Yes, with their reason |
+| Monitor | Nothing | Yes | Yes |
+| Allow | Nothing | Yes | No violation (the prompt is only counted) |
+
+* **Off** = the rule is not checked at all; the item is sent.
+* When several rules match, the **strictest action wins**: Block > Redact > Warn > Monitor > Allow.
+* **Presets** (top of the page): *Recommended* = the defaults above, *Strict* = every rule Block (including all file uploads), *Monitor only* = every rule Monitor. Applying a preset switches **every rule On**.
+* **Files:** text files up to 2 MB (txt, csv, json, code, logs, …) are also scanned with all the rules above. PDF, Office and image files are **not read**; only the "File uploads" rule applies to them.
+* A rule can be limited to one site (site scope); it is then not enforced on other sites.
+
+### 2. Website categories and Safe Search (every website)
+
+Lists are built into the extension, so the sites a person visits are not sent anywhere. A blocked page never loads; the person sees the AgentShield block page with the reason.
+
+24 categories in 4 groups, the way enterprise web filters (Zscaler, Cisco Umbrella: security vs. content categories) and parental controls (Qustodio, Net Nanny) arrange theirs. Every one is a switch.
+
+| Group | Category | Blocks | Default |
+| :--- | :--- | :--- | :--- |
+| **Security threats** | Malware, phishing & scams | Known dangerous sites: malware, phishing, fake shops, scams | **On** |
+| | Cryptomining | Sites and mining pools that mine cryptocurrency with the computer | Off |
+| | Spyware & stalkerware | Phone/computer spying apps and their servers (mSpy, FlexiSPY, …) | Off |
+| | Hacking & password cracking | Hacking tools, password cracks, stolen accounts | Off |
+| | Remote-access tools | AnyDesk, TeamViewer, UltraViewer, RustDesk… websites (used in "tech support" scams) | Off |
+| | Dynamic DNS | Free dynamic-DNS names (duckdns, no-ip, ddns.net…), often used by malware; may block home cameras/NAS | Off |
+| | URL shorteners | bit.ly, tinyurl, t.co… (hide the real destination; LinkedIn's lnkd.in stays open) | Off |
+| | Filter bypass | Public VPN, proxy and encrypted-DNS websites used to get around blocking | Off |
+| **Data leaks** | File sharing & online storage | Dropbox, WeTransfer, MediaFire, MEGA, Terabox, Gofile… | Off |
+| | Personal webmail | Yahoo Mail, Proton, Zoho, Rediffmail, throw-away mail (**Gmail and Outlook stay open**) | Off |
+| **Adult content & kids safety** | Adult content | Pornography and sexually explicit sites (the list also contains character.ai) | **On** |
+| | Mature & suggestive | Lingerie, suggestive and mixed adult sites | Off |
+| | Dating | Tinder, Bumble, OkCupid, Shaadi, Jeevansathi, TrulyMadly, Aisle… | Off |
+| | Gambling | Betting, casino and lottery sites | Off |
+| | Drugs | Sites that sell or promote illegal drugs | Off |
+| | Hate & violence | Hate speech, extremist and violent sites | Off |
+| | Weapons | Weapon shops and dangerous-material sites | Off |
+| | Chat rooms | Omegle-style and anonymous chat rooms (Chatroulette, Emerald Chat, OmeTV…) | Off |
+| | Piracy | Illegal streaming, torrent and download sites for films, music and software | **On** |
+| | **Safe Search** | Strict results on Google, Bing and DuckDuckGo; YouTube Restricted Mode | Follows *Adult content* until you set it yourself |
+| **Productivity** | Social networks | Facebook, Instagram, TikTok, X, … (**LinkedIn and Reddit stay open**) | Off |
+| | Movies, music & streaming | Netflix, Prime Video, Hotstar, Spotify, Gaana, JioSaavn, and any address with words like mp3, song, movie or bhojpuri (**YouTube stays open**) | Off |
+| | Online games | Browser games and gaming sites (Poki, Miniclip, Roblox, Steam, Epic Games, MPL, Ludo King…) | Off |
+| | Shopping | Flipkart, Myntra, Meesho, Ajio, Nykaa, eBay, AliExpress, Temu… (**Amazon stays open**) | Off |
+| | Job search | Naukri, Indeed, Glassdoor, foundit, Internshala… (**LinkedIn stays open**) | Off |
+
+**Quick settings (one click, top of Category blocking).** Each one sets *every* category; you can still change single switches afterwards:
+
+| Quick setting | Turns On | Safe Search |
+| :--- | :--- | :--- |
+| **Kids / family** | All security threats + adult, mature, dating, gambling, drugs, hate & violence, weapons, chat rooms, piracy + social networks | On |
+| **Workplace** | All security threats + file sharing, personal webmail + adult, mature, dating, gambling, drugs, hate & violence, weapons, piracy + online games | On |
+| **Security only** | All security threats + piracy (everything else Off) | Unchanged |
+| **All off** | Nothing | Off |
+
+For a child's browser, also consider **Block unapproved AI tools** (3) and your own Block rules (4) for specific sites. Time limits (bedtime or school-hours schedules) are not available.
+
+**Never blocked by a category** (so everyday work keeps working): google.com, googleapis.com, gstatic.com, googleusercontent.com, youtube.com, ytimg.com, microsoft.com, microsoftonline.com, live.com, office.com, windows.net, bing.com, apple.com, icloud.com, amazon.com, amazonaws.com, cloudfront.net, akamaihd.net, github.com, githubusercontent.com, wikipedia.org, cloudflare.com, blogspot.com, wordpress.com, linkedin.com, outlook.com, hotmail.com, gmail.com, zoom.us, slack.com, notion.so, atlassian.net, salesforce.com, and the main AI sites (chatgpt.com, openai.com, claude.ai, anthropic.com, perplexity.ai, deepseek.com, mistral.ai, poe.com, meta.ai, grok.com). Your own **Block** rules still apply to them. A site blocked by a category by mistake → add it as **Allow** in your website rules (4).
+
+### 3. Unapproved AI tools
+
+Switch **"Block unapproved AI tools"** On, and these AI sites are blocked unless they are on your **Allowed** list: chatgpt.com, chat.openai.com, claude.ai, gemini.google.com, aistudio.google.com, copilot.microsoft.com, perplexity.ai, chat.deepseek.com, deepseek.com, chat.mistral.ai, poe.com, character.ai, you.com, huggingface.co, meta.ai, grok.com, chat.qwen.ai, kimi.com, pi.ai, jasper.ai, writesonic.com, quillbot.com.
+
+New accounts start with **chatgpt.com, chat.openai.com, claude.ai, gemini.google.com and copilot.microsoft.com on the Allowed list**, so with the switch On those stay open and the others are blocked. Default: **Off** (all AI sites open, prompts still checked by the protection rules).
+
+### 4. Your own website rules
+
+| Type | Effect |
+| :--- | :--- |
+| **Block** | The domain and all its subdomains never load, whatever else is set. Stronger than everything else |
+| **Allow** | Exception to categories (2) and to unapproved AI blocking (3). Prompts on an allowed AI site are still checked |
+| Rule switched off (disabled) | Ignored |
+
+New accounts start with these **Block** rules (data-exfiltration risk), which you can switch off or delete: ilovepdf.com, smallpdf.com, pastebin.com, pdf2go.com, wetransfer.com.
+
+### 5. Activation lock (not a switch)
+
+Until a browser is connected to your account with an activation code, **all AI sites are blocked** in it (the 12 sites in (1) plus the AI sites in (3)), and nothing is sent from them. Installing the extension grants nothing. The lock comes back when the plan ends, the browser is removed in the portal, the account is disabled or the server cannot be reached for longer than the 15-minute session. Website rules from the last sync stay in force meanwhile.
+
+### 6. Employee status (company workspaces)
+
+| Status | Effect on that employee |
+| :--- | :--- |
+| Active | Normal rules |
+| Warned | Normal rules (a recorded warning only) |
+| Restricted | Every **Warn** becomes **Block** |
+| Suspended | **Everything** they send to an AI site is blocked, even with every rule Off |
+
+### How website blocks are enforced (two layers)
+
+1. **Network level:** the browser's own blocking rules (`declarativeNetRequest`) stop a blocked page before it loads (nothing is downloaded).
+2. **Page level** (backup for what network rules cannot see): when a rule or category is switched **On**, tabs that are **already open** on such a site are sent to the block page at once, without waiting for a reload; a page restored with the Back/Forward buttons (from the browser's cache, so no network request) is checked again; every navigation is also checked against your own Block rules and unapproved AI tools, and a check inside the page at load time covers the same.
+
+### What wins when several apply (websites)
+
+1. Your **Block** rule → blocked
+2. Browser **not connected** + AI site → blocked (activation)
+3. Your **Allow** rule → allowed
+4. **Unapproved AI tool** (switch On) or a **category** that is On → blocked
+5. Everything else → allowed
+
+### What is not restricted
+
+* Websites in categories that are Off, and every site not on any list.
+* Prompts on websites that are not AI sites (the list in (1)).
+* Copying is not watched, and pasting is only checked inside AI sites' prompt boxes (pasted files as uploads).
+* Content inside PDF, Office and image files.
+* Free plan with its monthly prompt checks used up: AI sites stay open and website controls keep working, but prompts are **not checked** until the 1st of the month, an upgrade or credits.
+* Other browsers (Firefox, Safari), desktop AI apps, and browsers without the extension.
+
 ## Configuration
 
-See [DEPLOYMENT.md §2](./DEPLOYMENT.md#2-environment-variables). Key variables: `ENVIRONMENT`, `SECRET_KEY` (no default; required in production, random per process in development), `DATABASE_URL`, `INITIAL_ORG_NAME`, `INITIAL_ADMIN_EMAIL/PASSWORD` (optional, no defaults; both needed to create a first customer company), `DEMO_AUDITOR_PASSWORD` (development only), `ALLOWED_ORIGINS`, `DEMO_MODE`, `DEVICE_EVENTS_PER_MINUTE`; internal console: `STAFF_TOKEN_HOURS` (8), `STAFF_MFA_KEY` (optional; derived from `SECRET_KEY` if empty), `ADMIN_CONSOLE_URL` (staff invite links; dev default `http://localhost:5175`); accounts and usage (2.1): `COMPANY_SIGNUP_ENABLED` (false), `CREDITS_DEVICE_LIMIT` (3); free plan and referrals (2.3): `FREE_TIER_ENABLED` (true), `REFERRAL_BONUS_CHECKS` (100), `REFERRAL_MAX` (10); licensing: `TRIAL_DAYS` (30), `TRIAL_CLAIMS_PER_IP_30D` (3), `REMINDER_LOOP_ENABLED` (true), `PASSWORD_RESET_EXPIRE_MINUTES` (60), `DASHBOARD_TOKEN_HOURS` (12); accounts and activation: `SIGNUP_ENABLED` (true), `SIGNUP_ALLOWED_DOMAINS`, `EMAIL_VERIFY_EXPIRE_HOURS` (24), `EMAIL_VERIFICATION_REQUIRED` (false, 2.4.1), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS`, `DASHBOARD_URL`, `INVITE_EXPIRE_HOURS` (72), `ACTIVATION_TOKEN_EXPIRE_MINUTES` (30), `DEVICE_SESSION_MINUTES` (15), `MAX_DEVICES_PER_USER` (3, browsers or PCs), `MAX_BROWSERS_PER_COMPUTER` (10, 2.4), `LEGACY_DEVICE_KEYS_ENABLED` (false); payments: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (both needed, otherwise payments are off), `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_API_BASE` (`https://api.razorpay.com/v1`), `BILLING_SELLER_NAME` (AgentShield), `BILLING_SELLER_DETAILS` (printed on receipts); dashboard and admin-console builds: `VITE_API_BASE_URL` (`VITE_SHOW_DEMO_LOGINS` was removed in 2.0).
+Templates: `.env.example` (development) and `.env.production.example`; production values and where to set them (Render, Vercel): [DEPLOY_STEPS.md](./DEPLOY_STEPS.md). Key variables: `ENVIRONMENT`, `SECRET_KEY` (no default; required in production, random per process in development), `DATABASE_URL`, `INITIAL_ORG_NAME`, `INITIAL_ADMIN_EMAIL/PASSWORD` (optional, no defaults; both needed to create a first customer company), `DEMO_AUDITOR_PASSWORD` (development only), `ALLOWED_ORIGINS`, `DEMO_MODE`, `DEVICE_EVENTS_PER_MINUTE`; internal console: `STAFF_TOKEN_HOURS` (8), `STAFF_MFA_KEY` (optional; derived from `SECRET_KEY` if empty), `ADMIN_CONSOLE_URL` (staff invite links; dev default `http://localhost:5175`); accounts and usage (2.1): `COMPANY_SIGNUP_ENABLED` (false), `CREDITS_DEVICE_LIMIT` (3); free plan and referrals (2.3): `FREE_TIER_ENABLED` (true), `REFERRAL_BONUS_CHECKS` (100), `REFERRAL_MAX` (10); licensing: `TRIAL_DAYS` (30), `TRIAL_CLAIMS_PER_IP_30D` (3), `REMINDER_LOOP_ENABLED` (true), `PASSWORD_RESET_EXPIRE_MINUTES` (60), `DASHBOARD_TOKEN_HOURS` (12); accounts and activation: `SIGNUP_ENABLED` (true), `SIGNUP_ALLOWED_DOMAINS`, `EMAIL_VERIFY_EXPIRE_HOURS` (24), `EMAIL_VERIFICATION_REQUIRED` (false, 2.4.1), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS`, `DASHBOARD_URL`, `INVITE_EXPIRE_HOURS` (72), `ACTIVATION_TOKEN_EXPIRE_MINUTES` (30), `DEVICE_SESSION_MINUTES` (15), `MAX_DEVICES_PER_USER` (3, browsers or PCs), `MAX_BROWSERS_PER_COMPUTER` (10, 2.4), `LEGACY_DEVICE_KEYS_ENABLED` (false); payments: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (both needed, otherwise payments are off), `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_API_BASE` (`https://api.razorpay.com/v1`), `BILLING_SELLER_NAME` (AgentShield), `BILLING_SELLER_DETAILS` (printed on receipts); dashboard and admin-console builds: `VITE_API_BASE_URL` (`VITE_SHOW_DEMO_LOGINS` was removed in 2.0), plus, for the portal, `VITE_ADMIN_CONSOLE_URL` (required on Vercel: the sign-in card's **Site owner? Admin login** link); website build: `VITE_PORTAL_URL` (required on Vercel).
 
 ## For AI agents and contributors
 
@@ -430,7 +699,7 @@ See [DEPLOYMENT.md §2](./DEPLOYMENT.md#2-environment-variables). Key variables:
 7. **New rule IDs** must be added to `core/catalog.py` (otherwise the API rejects policies for them), both detectors, and `RULE_LABELS`/`RULE_ADVICE` in `shared/policy.ts`. (The extension has no built-in rules any more: it enforces only rules synced while authorized.)
 8. **No fake data or success messages** in the dashboard; every number must come from the API.
 9. **Do not edit generated files:** `extension/dist/**`, `extension/src/popup/popup.js`, `dashboard/dist/**`, `admin-console/dist/**`.
-10. **Schema changes:** prefer new tables; for new columns add to `_align_schema()` and a file in `backend/migrations/`; new tables get RLS automatically on PostgreSQL.
+10. **Schema changes:** prefer new tables; for new columns add to `_align_schema()` and a new section at the end of `backend/migrations/RUN_ALL_IN_SUPABASE.sql`; new tables get RLS automatically on PostgreSQL.
 
 ### Where to change things
 
@@ -447,23 +716,166 @@ See [DEPLOYMENT.md §2](./DEPLOYMENT.md#2-environment-variables). Key variables:
 | Usage metering, credits, limits | `core/usage.py` (what counts, atomic credit spending, ledger), `core/entitlements.py: current_entitlement` (states, `DENIAL_CODES`), `api/events.py` (metering call), `api/usage.py`, `core/payments.py` (credit packs, refunds/disputes), `extension/src/background/auth-state.ts`, `dashboard/src/pages/Usage.tsx`, `backend/tests/test_individual.py` |
 | Free plan, paused checks, referrals | `core/entitlements.py: free_plan_for` (`FREE_ACTIVE`/`FREE_PAUSED`, `ACCESS_STATES` for connection gates in `api/deps.py`, `api/device_auth.py`, `api/users.py`), `core/referrals.py`, `api/referrals.py`, `api/auth.py` (signup `referral_code`, `verify_email` reward), `core/notifications.py`, `extension/src/background/auth-state.ts` (`checksPaused`), `service-worker.ts`, `content/content.ts`, `popup/popup.ts`, `dashboard/src/pages/Account.tsx`, `Usage.tsx`, `Login.tsx` (`#ref=`), `backend/tests/test_free.py` |
 | Account types (Individual / Company) | `Organization.account_type`, `api/auth.py: signup`, `api/deps.py: require_company_workspace`, `dashboard/src/components/Sidebar.tsx`, `dashboard/src/pages/Login.tsx`, `test_individual.py` |
-| New internal console permission or role | `STAFF_PERMISSIONS` / `STAFF_ROLES` / `STAFF_ROLE_LABELS` in `core/permissions.py`, `ck_staff_role` in a new migration (for a role), the `MATRIX` in `backend/tests/test_internal.py` (every permission must be covered), the role table in this README |
+| New internal console permission or role | `STAFF_PERMISSIONS` / `STAFF_ROLES` / `STAFF_ROLE_LABELS` in `core/permissions.py`, `ck_staff_role` in a new section of `RUN_ALL_IN_SUPABASE.sql` (for a role), the `MATRIX` in `backend/tests/test_internal.py` (every permission must be covered), the role table in this README |
 | New internal console API or page | route in `api/platform.py` (or `api/staff_admin.py`, `api/payments.py: platform_router`) with `require_staff("<permission>")` and an audit with `actor_type="staff"`; `admin-console/src/api.ts`, `types.ts`, `pages/X.tsx`, `NAV` in `admin-console/src/App.tsx` (with its permission); `test_internal.py` |
 | Staff sign-in, MFA, invites, bootstrap | `api/staff_auth.py`, `core/totp.py`, `api/staff_admin.py`, `app/cli.py`, `admin-console/src/pages/SignIn.tsx`, `test_internal.py` |
 | Block an extra site in a website category | `extension/src/shared/web-category-additions.json`, then `node extension/scripts/update-web-categories.js --additions-only`; `npm test` in `extension/` |
-| AgentShield Windows app (connect a PC once; no longer used by the extension since 1.9.0) | `api/computers.py` (still used by the Network Agent), `api/device_auth.py: activate` (codes with `computer_id`), `core/entitlements.py: active_device_count`, `scripts/helper/AgentShieldHelper.cs`, `scripts/system-installer/*`, `dashboard/src/pages/MyActivation.tsx` (list of old PCs, Remove PC), `backend/tests/test_computers.py` |
+| PCs connected earlier (Windows app retired in 2.6, Network Agent removed in 2.6.1) | `api/computers.py`, `api/device_auth.py: activate` (codes with `computer_id`), `core/entitlements.py: active_device_count`, `dashboard/src/pages/MyActivation.tsx` (list of old PCs, Remove PC), `backend/tests/test_computers.py` |
 | Rule sync, revision, On/Off enforcement | `core/policy_revision.py` (call `bump_policy_revision` in every endpoint that changes what browsers enforce), `api/policies.py` (`list_policies` ensures every catalog row, `/revision`), `service-worker.ts: periodicRefresh/revisionChanged/syncPolicies`, `shared/policy.ts: actionForRule/policiesComplete`, `content.ts`, `backend/tests/test_policy_revision.py`, `extension/tests/e2e/rules-e2e.js` |
 | Store packages | `scripts/packaging/store-packages.js` (allowed permissions, forbidden files, checks), `extension/build.js` (`AGENTSHIELD_API_URL`, `AGENTSHIELD_DASHBOARD_URL`), [STORE_SUBMISSION.md](./STORE_SUBMISSION.md) |
-| Installer fields | `scripts/system-installer/Install-AgentShield.ps1`, `dist-installer/Quick-Install.bat`, `extension/managed_schema.json` (server address only; never a credential) |
+| Installer fields | `scripts/system-installer/Install-AgentShield.ps1`, `extension/managed_schema.json` (server address only; never a credential) |
 
 ### Definition of done
 Backend tests pass on a temporary DB; `npm test`, `npx tsc --noEmit` and `node build.js` pass in `extension/`; `npm run build` passes in `dashboard/` (and in `admin-console/` when it changed); docs (this file's change history, and DATA_HANDLING / SECURITY_ARCHITECTURE if behaviour changed) are updated.
+
+## Testing
+
+### Automated tests
+
+Always run the backend tests against a throwaway SQLite database: `.env` may point at the live Supabase database (AGENTS.md rule 1).
+
+```powershell
+cd backend
+$env:DATABASE_URL = "sqlite:///./test_agentshield.db"
+Remove-Item .\test_agentshield.db -ErrorAction SilentlyContinue   # start from a fresh file
+.venv\Scripts\python.exe -m pytest tests -q                       # plain "pytest" also works (backend/pytest.ini sets pythonpath)
+
+cd ..\extension
+npm test            # detector parity, policy, website decisions, activation/licence state machine, activation round-trip (no browser)
+npx tsc --noEmit    # type check
+node build.js
+npm run test:e2e    # optional: real browser (headless Microsoft Edge, throwaway database, no internet)
+
+cd ..\dashboard
+npm run build       # type check + production build
+
+cd ..\admin-console
+npm install; npm run build
+```
+
+The backend tests need **no credentials in code or in `.env`**: `backend/tests/conftest.py` sets throwaway, test-only values (signing key, a test company admin, the demo auditor password, reminder loop off, `EMAIL_VERIFICATION_REQUIRED=true`, no DNS lookups for sign-up emails) with `setdefault` before the app is imported; never reuse them on a real server. Delete `test_agentshield.db` before each run: some suites (e.g. `test_saas.py`) assume a clean database. Tests never call Razorpay: `test_billing.py` and `test_individual.py` use a fake Razorpay and synthetic webhooks signed with a test secret.
+
+| Suite | What it proves |
+| :--- | :--- |
+| `backend/tests/test_detection.py` + `extension/tests/run-tests.js` | The **same** `detection_cases.json` (51 synthetic positives and negatives, incl. look-alikes) gives exactly the expected rules in both detectors; card/Aadhaar masked for storage |
+| `extension/tests/run-tests.js` (rest) | Action precedence, disabled rules (no built-in defaults), site scopes, Suspended / Restricted, website precedence, subdomains and look-alike domains, categories, the activation state machine (states, which sites are blocked while locked), licence and usage lock codes keep the browser's identity, forged flags from storage refused, store-package checks |
+| `extension/tests/activation-roundtrip.js` | A dashboard-made activation code is accepted (also with stray whitespace), old `ASE1.` codes are refused |
+| `extension/tests/e2e/rules-e2e.js` | Real browser: activation with a real single-use code, then every dashboard switch On and Off (below) |
+| `test_policy.py`, `test_policy_twins.py`, `test_policy_revision.py`, `test_dlp_rules.py`, `test_web_filter.py` | Server-side precedence and redaction; the twins agree; every enforced change bumps the revision; the 2.6 DLP rules; website categories |
+| `test_api.py`, `test_enterprise.py` | No unauthenticated access; device credential scope; revocation; server-side masking; organization from the credential; privacy settings; keywords; viewer limits; tenant isolation; catalog-only rules; presets; audit entries; heartbeats; CSV export masking and formula neutralization |
+| `test_activation.py`, `test_computers.py` | Fresh install has no access; random, used, revoked and expired codes refused; a code binds the browser to its owner; device approval and limits; copied device IDs, replayed challenges and forged sessions refused; revocation and disabling lock live sessions; invite and self sign-up flows; PC connection (one slot, removal signs out its browsers) |
+| `test_saas.py`, `test_billing.py`, `test_individual.py`, `test_free.py`, `test_no_email_confirmation.py`, `test_signup_email_check.py`, `test_distribution.py` | Sign-up, trial once and its abuse controls, licence expiry/renewal/revocation/suspension, browser limits, payments (capture, duplicates, mismatches, refunds, disputes, subscriptions, reconcile), metering once per `client_event_id`, credits and limits, personal API tokens, Free plan and referrals, sign-up without confirmation, email-address checks, download links need a plan |
+| `test_internal.py` | Internal console: MFA before any session, single-use TOTP and recovery codes, lockout, forced password change, bootstrap command, token separation, the permission matrix for every role, owner-only licence/credit exceptions, staff invites and role changes |
+| `test_no_hardcoded_secrets.py` | Shipped source contains no live keys, private keys, device keys, codes or tokens, and no `os.getenv` default for any password/secret/key/token setting |
+
+### Latest results (2.6.0 / extension 1.9.0; backend and extension re-run 2026-10-31)
+
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **273 passed**; also passes with plain `pytest` (`backend/pytest.ini`) |
+| Extension unit | `cd extension; npm test` | **135 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
+| Dashboard | `cd dashboard; npm run build` | passes |
+| Store packages | `node scripts/packaging/store-packages.js --api-url https://… --dashboard-url https://…` | all checks pass (2.6.0) |
+| **Real browser** | `cd extension; npm run test:e2e` | **121/121 passed** on Microsoft Edge 156, headless (2.6.0) |
+
+The real-browser test starts the backend on a throwaway SQLite file with a random test admin, loads the unpacked test build (`node build.js --e2e`) in a temporary Edge profile with DNS off except 127.0.0.1, activates it with a real single-use code, then switches each control through the dashboard's API and checks the browser: every protection rule and file uploads Off → sent, On → Block / Warn / Redact; the paste check; each of the 24 categories On → blocked, Off → open; an already-open tab blocked when its category is switched On; Kids preset and All off; Safe Search; unapproved AI; website rules; one change applied by the extension's own once-a-minute check without a manual sync. **Not covered:** Google Chrome (branded Chrome 137+ refuses `--load-extension`; the package is the same), a manual run on a clean PC, and the real AI websites (their layouts are covered by the selectors in `adapters/chatgpt.ts`, not by this test).
+
+**Security scans** (15 October 2026): `pip-audit -r backend/requirements.txt` no known vulnerabilities; `bandit -r backend/app -ll` one medium finding (dev launcher bound to all interfaces), fixed; `npm audit` extension 0; dashboard `npm audit --omit=dev` 0 (2 advisories only in the Vite 5 / esbuild dev server, not shipped; the fix needs Vite 7+).
+
+### Manual end-to-end scenarios
+
+Use synthetic data only. With `DEMO_MODE=true` the dashboard's **Guided Demo** page runs the core scenarios and verifies each one against real events.
+
+**Activation end-to-end (run first):**
+
+1. Start the backend on a SQLite test database **without** SMTP (`$env:DATABASE_URL = "sqlite:///./test_agentshield.db"`), then uvicorn and the dashboard as in [Quick start](#quick-start-one-pc-10-minutes).
+2. Sign in as the initial admin (set throwaway `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` values before the first start of the test database; its company gets an internal licence; there are no built-in logins) → **Users & Devices** → **Invite someone** with a test email (role EMPLOYEE). (Or test self sign-up and **Start free** instead.)
+3. Copy the invite link from the backend console, open it, and set a password (12+ characters).
+4. Sign in as that account → **My activation** → **Generate activation code**.
+5. Load the unpacked extension (`extension/` after `node build.js`). Open chatgpt.com: the **Activation Required** page appears.
+6. Click the AgentShield icon (**Activation Required**, three numbered steps) → paste the code in **Activation code** → **Connect and verify**. No email or password is asked. The popup shows success only after the server confirms, signed in as the account that generated the code.
+7. Open chatgpt.com again: the page loads and prompts are checked (scenario 2 is blocked).
+8. As admin, **Users & Devices** → Authorized browsers → **Revoke** that browser. At its next request to the server (within about a minute; at once after **Sync policies**), AI sites show **Activation Required** again.
+
+| # | Scenario | Expected result |
+| :--- | :--- | :--- |
+| 1 | Activation (before/after pasting a code) | First **Activation Required**; then popup Protected, signed in as the account; the browser is listed in Users & Devices and Protected Browsers within 1 minute |
+| 2 | Send `api_key = sk-demo-ABCDEF1234567890XYZ` on chatgpt.com | Red notice; not sent; event `secret.api_key_like` BLOCK |
+| 3 | Open that event | Stored text shows `api_****[MASKED]`, never the key |
+| 4 | Send `Draft a reply to priya.sharma@example.com`, give a reason, **Send anyway** | Amber notice; event WARN `warned_and_confirmed` with the reason |
+| 5 | In scenario 2 press Enter again or click Send | Blocked every time (dismissing is not a bypass) |
+| 6 | After confirming scenario 4, add a key to the text and press Enter | Blocked (an approval covers only the confirmed text) |
+| 7 | Send the scenario-2 text with Ctrl+Enter | Blocked |
+| 8 | Send `Summarise PROJECT-ALPHA-CONFIDENTIAL` (a keyword) → **Mask and send** | Sent as `[REDACTED:RESTRICTED]`; event REDACT |
+| 9 | Attach a .txt containing `db password: Demo-Only-Passw0rd` | Upload blocked; outcome `file_blocked` |
+| 10 | Attach any PDF | Warning (file.upload = Warn) noting PDF content is not inspected |
+| 11 | Open `https://pastebin.com` | Block page; event `dlp.blocked_domain` |
+| 12 | "Block unapproved AI tools" On, Sync, open `https://chat.deepseek.com` | Block page "AI tool not approved"; chatgpt.com still opens |
+| 13 | Set Email to Block, Sync, repeat scenario 4 | Blocked; audit `policy.update` with before/after |
+| 14 | Employee profile → Suspend; wait 30 s; send `hello` | Blocked: access suspended |
+| 15 | Stop the backend; repeat 2; wait up to 15 minutes; restart | Blocked while the session lasts, then **Activation Required** (fail closed); after restart the browser reconnects and the queued event appears |
+| 16 | Revoke the browser | **Activation Required** at its next server request; popup explains; audit `device.revoke` |
+| 17 | Send a clean prompt; open it in events | "Prompt text was not stored" (privacy default) |
+| 18 | Sign in with a wrong password | `login.failed` in the audit log, without the password |
+| 19 | Use one code in a second browser, then in a third | Second: signed in as the code's owner; third: refused ("already used"), `device.activate_failed` |
+| 20 | **Require admin approval for new browsers** On; activate a browser | Waits for approval, AI sites blocked; works after **Approve** |
+| 21 | Disable the test user | Their browsers show **Activation Required** at the next server request; dashboard sign-in refused |
+| 22 | Popup → **Sign out this browser** | AI sites blocked again; audit `device.sign_out` |
+| 23 | Sign-up: **Create an account** (check the *Coming soon* Company card), then `POST /auth/signup` with `"account_type": "COMPANY"`; same email again; **Forgot password?** | Signed in at once with the personal sidebar; API `403 COMPANY_COMING_SOON`; second sign-up "already exists"; the reset link signs in and ends other sessions; disposable and (with `SIGNUP_ALLOWED_DOMAINS`) other domains refused |
+| 24 | **Start free**; with `EMAIL_VERIFICATION_REQUIRED=true` before and after opening the confirmation link; try the trial again from a Gmail alias | Before confirmation (when required) refused; then trial active and code generation enabled; repeat and alias claims refused with a reason; audit `trial.claimed` / `trial.refused` |
+| 25 | Set a licence end date in the past (test DB only); popup **Check again** | **Your plan has ended**, AI sites blocked, red banner in the dashboard |
+| 26 | Internal console → Accounts → extend the licence 7 days with a reason; **Check again** | Same browser active again without a new code; audit `platform.license_extend` |
+| 27 | Browser limit 1 (internal console); activate a second browser | Refused (`DEVICE_LIMIT`) |
+| 28 | Revoke the licence; then grant one, suspend and lift the account | Locked with `LICENSE_REVOKED`, then `ORG_SUSPENDED`; reconnects by itself after lifting |
+| 29 | Customer token on `GET /internal/api/companies`; staff token on `GET /api/v1/policies` | `401` both times |
+| 30 | Licence ending in 3 days; internal console Overview → **Run now** twice | Reminder appears once on **Account & plan** (and is emailed) |
+| 31 | **Forgot password?** → open the link → new password | Signed in; other sessions ended; reusing the link fails |
+| 32 | No Razorpay keys; **Account & plan** | Buttons say **Contact AgentShield**; `POST /api/v1/billing/checkout` → `503` |
+| 33–37 | Razorpay **test mode** (`rzp_test_` keys, reachable webhook): one-time purchase; closed window / broken webhook then **Reconcile**; monthly subscription and cancel; refund from internal console → Payments; forged webhook signature | "Test mode" shown, receipt, plan active, webhook events `processed`; Reconcile completes a missed payment; cancel keeps the plan to the period end; a full refund ends the plan, a partial one keeps it; forged webhook `400`, nothing changes |
+| 38–44 | Internal console: `python -m app.cli create-platform-owner` twice; first sign-in; reused TOTP and recovery codes; five wrong passwords; staff invite and role change; licence exception; last owner | Second owner refused; MFA enrolment, 10 recovery codes once, forced password change (14+); reused codes refused; 15-minute lockout; pages limited by permission, session ended on role change; exception owner-only with `payment_ref` `exception:<owner>`; the last owner cannot be disabled or demoted |
+| 45–51 | Individual accounts: credit pack in Razorpay test mode; metering (3 prompts, a blocked site, a file); own monthly limit; `GET /api/v1/org/users` as an individual; personal API token | Credits only after a confirmed payment, popup **Pay as you go**; 3 checks counted (site and file not); `SPEND_CAP` lock and unlock without a new code; `403 COMPANY_FEATURE_UNAVAILABLE`; token shown once, alerts without prompt text, other scopes `403`, other APIs `401`, `401` after revoking |
+
+**Still to do on a real PC:** the activation end-to-end and the popup scenarios in Google Chrome on a clean PC (Edge is covered by the automated real-browser test), scenarios 33–37 and 45 in Razorpay test mode with live webhooks, and the Free plan's "Protection paused" popup. Record the date, browser and result when they are run. Earlier failure for the record: scenario 2 failed on real chatgpt.com with 1.2.0 (listeners attached too late); fixed in 1.2.1 and passed in a harness replicating the new composer; a re-test on real chatgpt.com is still open.
+
+### Demonstration script (about 15 minutes)
+
+For a security reviewer or buyer. Prepare: backend with `DEMO_MODE=true`, one activated Chrome or Edge, the dashboard open on a second screen.
+
+1. **Problem (1 min).** "Employees paste customer data and keys into AI tools. We stop that in the browser, before it is sent."
+2. **Coverage & Limits page (1 min).** Show honestly what is and isn't enforced.
+3. **Credential block (2 min).** Scenario 2, then 5 (pressing Enter again doesn't bypass). Show the event and that the key is masked (scenario 3).
+4. **Warn with justification (2 min).** Scenario 4; show the reason in the event.
+5. **Redaction and file upload (2 min).** Scenarios 8 and 9.
+6. **Websites (2 min).** Scenarios 11 and 12.
+7. **Central control (2 min).** Scenario 13, then the Admin Audit Log entry.
+8. **Resilience (2 min).** Scenario 15 (offline).
+9. **Operations (1 min).** Protected Browsers page, CSV export, retention setting.
+
+### Known gaps in testing
+
+No automated Google Chrome run (only Edge); no manual run on a clean PC yet; payments and credit packs tested only against a fake Razorpay; the real AI websites' layouts are not covered by automated tests; PDF/Office content, Firefox/Safari and SSO are out of scope. Product limitations: [Known limitations](#known-limitations) and [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limitations-not-enforced).
 
 ## Known limitations
 
 Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limitations-not-enforced): Chromium browsers only; employees can remove an extension unless it is force-installed by policy; PDF/Office/image content is not inspected; pattern-based detection can miss rephrased data; site layout changes can disable prompt checks on that site; customer accounts use email + password (no SSO/MFA; staff have TOTP MFA but no hardware-key/WebAuthn option); the staff session token is in `sessionStorage`, so an XSS in the console would expose it (the console loads no third-party scripts, only Google Fonts); the internal console has no customer analytics, support or further operations pages yet (Phases B–D); INTERNAL licences still exist for the initial company created from `INITIAL_ADMIN_*`; sign-up signs in before the email is confirmed, so someone can register an address they do not own (the trial still needs the confirmation link) until the owner takes it over with Forgot password; usage metering counts only what activated extensions report (a modified extension could under-report, and the server cannot see prompts that are never reported, but protection stops server-side when access ends); the offline event queue is capped at 500 events; the usage month is the UTC calendar month; credits never expire and there are no invoices beyond payment receipts; Company features are hidden and refused for individual accounts (existing company tenants keep them); a user with developer mode can edit a self-installed extension to skip the activation screen (the server still refuses it); lockout/rate-limit counters (customer and staff) are per-process memory; no automatic deletion of the admin audit log; the dashboard loads Google Fonts; Vite 5 dev-server advisories (dev only); payment receipts are not GST tax invoices; no proration when switching plans; reconciliation covers one-time orders only (monthly charges rely on webhooks).
 
 ## Change history
+
+### 2.6.1 — Reliable backend deploys, a leaner repository and fewer documents (2026-10-31)
+* **Reported problem: the backend errored after the project was copied to another PC and pushed.** The code itself passes every test; what changed between PCs and pushes was the environment around it:
+  1. `backend/requirements.txt` used `>=`, so every Render build and CI run installed whatever library versions were newest that day (a fresh install already pulled FastAPI 0.162 / Starlette 1.10 where the development PC had 0.143 / 1.7). All versions are now **pinned to the exact set the test suite passed with**; upgrade by editing a version, running the tests, then pushing.
+  2. Render's image ran **Python 3.11** and CI tested 3.11/3.12, while development uses **3.14**. The Dockerfile now uses `python:3.14-slim` and CI tests 3.14, so the version that passes the tests is the version that runs. Python 3.11 is the minimum (SQLAlchemy 2.1); the docs said 3.10.
+  3. The Dockerfile started **4 workers** if a Render service was created without the Blueprint (`render.yaml` sets 1): too much for the free plan's 512 MB, and the in-memory replay protection needs one process. It now starts one worker on `$PORT`, the same command as `render.yaml`. The compiler packages were dropped (every requirement installs from a prebuilt wheel), making builds faster and removing a step that could fail.
+  4. CI ran the tests without `DATABASE_URL`; it now uses a throwaway SQLite file (AGENTS.md rule 1).
+* **Fallback on start:** if the database refuses the first connections (a pooler hiccup right after a deploy or a wake-up) the backend retries for about 20 seconds before failing, and logs `Database unreachable at startup; check DATABASE_URL` when it gives up (`main.py: _prepare_database`). A failed start never replaces the running version: Render keeps the previous deploy live; how to read the log and roll back is in DEPLOY_STEPS.md.
+* **Admin passwords:** the console sidebar has **Change password** for the signed-in admin; a platform owner can reset another admin's forgotten password in **Staff & roles → Reset password** (`POST /internal/api/staff/{id}/reset-password`: a one-time temporary password shown to the owner, sessions ended, new password required at next sign-in, authenticator still required, audited as `staff.password_reset`; not for your own account); the staff sign-in page's **Forgot password?** explains this and the `reset-staff-password` command for the only owner. No email reset for staff accounts, on purpose. When the database in `DATABASE_URL` cannot be reached (e.g. an outdated Supabase password in `.env`), `python -m app.cli` now says so in two lines instead of a traceback, and changes nothing.
+* **One way to log in:** the website's **Log in** dropdown (Log in as user / Log in as admin), its mobile-menu admin link and its footer "Admin log in" link were removed. **Log in** now opens the portal's sign-in page directly, and staff use that card's **Site owner? Admin login** link. That link was hidden in production unless the optional `VITE_ADMIN_CONSOLE_URL` was set, so the **portal's** Vercel build now requires it and stops with "Set VITE_ADMIN_CONSOLE_URL in the Vercel project settings"; the website no longer needs it.
+* **CI fix (the error on push):** GitHub Actions ran plain `pytest`, which does not put `backend/` on the import path, so every test that imports the app failed with `No module named 'app'` (18 collection errors); locally `python -m pytest` hid it. `backend/pytest.ini` (`pythonpath = .`) fixes both ways, CI runs `python -m pytest`, and its actions were updated to the Node 24 versions (checkout v5, setup-python v6, setup-node v5, Node 22 for the builds).
+* **Network Agent removed** (customers use the extension): the `agent/` source and tests, both copies of `AgentShield-Agent.exe`, the download route `/extension-updates/download/AgentShield-Agent.exe`, the `AGENT_PACKAGE_PATH` setting, `downloads.network_agent` in `/extension-updates/info`, and the portal's Download card; `POST /api/v1/me/download-link` accepts only `agentshield-extension.zip`. `/api/v1/computer/*` stays so PCs connected earlier can be listed and removed.
+* **Leaner repository (about 36 MB less):** also removed the store-upload zip from `backend/release/package/` (never served; `store-packages.js` / `pack-extension.js` still build it into `dist-installer/package/`), the retired `dist-installer/helper/AgentShieldHelper.exe`, `Quick-Install.bat` and its `README.txt` (the portal's Download zip replaces the folder install), the Docker Compose setup (`docker-compose*.yml`, `scripts/deploy.bat|.sh`, `POSTGRES_*` in the example env files; Render builds `backend/Dockerfile`, own servers run uvicorn), the demo-seed SQL (`SUPABASE_SETUP.sql`, `supabase_schema.sql`, which created logins with published passwords), and the twelve `backend/migrations/2026_10_*.sql` files (all already in `RUN_ALL_IN_SUPABASE.sql`, now the only migration file). Also gone: the portal's `Dockerfile` / `nginx.conf` / `.dockerignore` (Vercel builds it), the unused `extension/rules.json` and `icon-256.png` / `icon-512.png` / `icon.ico` (the manifest uses the 16–128 px icons), the old-name wrapper `scripts/enterprise/Set-AgentShieldPolicy.ps1` (use `Install-AgentShield.ps1`), two empty `admin-console/test_*.py` stubs, and `.claude/` is no longer pushed (local assistant settings).
+* **Documents:** DEPLOYMENT.md, DEPLOY_VERCEL.md and INSTALL.md were merged into **DEPLOY_STEPS.md** (the one deployment and operations guide); USER_SETUP.md, RESTRICTIONS.md and TESTING.md into README.md (**User setup**, **What is blocked and allowed**, **Testing**). Links in the other documents, the vite configs, the install script and the portal point to the new places. `.env.example` no longer carries a published default `SECRET_KEY`.
+* **Moving to another PC:** copy only the files git tracks (no `node_modules`, `.venv`, databases, `.env` or `keys`), recreate the backend `.venv` there, and copy `.env` / `keys` privately (DEPLOY_STEPS.md).
+* **Tests:** backend 273 (also with plain `pytest` on Python 3.11, as CI runs it), run on a clean copy of the pushed files with freshly installed pinned dependencies; extension 135; dashboard, website and console builds pass; production-mode start (`ENVIRONMENT=production`, release folder) answers `/health` and `/health/ready`; the pinned set installs on Linux for Python 3.11, 3.12 and 3.14.
 
 ### 2.6.0 — Dashboard switches control enforcement, near real-time sync, store-ready extension without the .exe (extension 1.9.0) (2026-10-26)
 * **Reported bug: rules kept blocking after they were switched Off.** Causes found and fixed:
@@ -475,7 +887,7 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 * **No `.exe` dependency in the extension:** the `nativeMessaging` permission, `shared/pc-app.ts`, the popup's "Connect with the AgentShield app" card and `CONNECT_VIA_PC` were removed; each browser connects with its activation code. Portal: **Connect browser** no longer offers "Connect this PC" or the setup `.exe` (PCs connected earlier are listed so they can be removed); **Download** puts the extension first and labels the Network Agent optional; **Deployment** explains force-install by Chrome/Edge policy instead of the setup `.exe`. The backend's `/api/v1/computer/*` stays for the Network Agent.
 * **Store packages:** `node scripts/packaging/store-packages.js --api-url https://… --dashboard-url https://…` builds `dist-store/agentshield-chrome-1.9.0.zip` and `agentshield-edge-1.9.0.zip` (no manifest key, runtime files only) after checking them: Manifest V3, only `storage`/`alarms`/`tabs`/`declarativeNetRequest`, every referenced file present, no `.exe`/keys/source maps/sources, no remote or dynamic code, no native messaging, production server present. Listing text, permission justifications and privacy disclosures: [STORE_SUBMISSION.md](./STORE_SUBMISSION.md). `node build.js` reads `AGENTSHIELD_API_URL` / `AGENTSHIELD_DASHBOARD_URL` (https only).
 * **17 more switchable website categories, grouped like enterprise web filters and parental controls** (24 in total, all new ones Off by default, so nothing changes until switched on): *Security threats* (cryptomining, spyware & stalkerware, hacking, remote-access tools, dynamic DNS, URL shorteners), *Data leaks* (file sharing & online storage, personal webmail), *Adult content & kids safety* (mature & suggestive, dating, drugs, hate & violence, weapons, chat rooms), *Productivity* (online games, shopping, job search). Lists come from the UT1 blacklists of Université Toulouse Capitole (CC BY-SA 4.0, credited in `extension/rulesets/LICENSE-DATA.md`) plus AgentShield's own additions for Indian and major sites (Flipkart, Myntra, Naukri, MEGA, Proton…). `node scripts/update-web-categories.js --only <ids>` builds chosen categories without touching the others; the 7 existing lists are byte-for-byte unchanged. More never-block sites (LinkedIn, Gmail, Outlook, Zoom, Slack, Notion, Atlassian, Salesforce) apply to future list builds.
-* **Quick settings** in Category blocking: **Kids / family**, **Workplace**, **Security only**, **All off** (`WEB_CATEGORY_PRESETS` in `core/catalog.py`, sent with `GET /api/v1/org/settings` as `web_category_presets`, applied through the normal settings PATCH, so it is audited and bumps the revision). Categories are shown under headings (`web_category_groups`). Block page texts and "Can this be switched off?" cover every category. See [RESTRICTIONS.md](./RESTRICTIONS.md).
+* **Quick settings** in Category blocking: **Kids / family**, **Workplace**, **Security only**, **All off** (`WEB_CATEGORY_PRESETS` in `core/catalog.py`, sent with `GET /api/v1/org/settings` as `web_category_presets`, applied through the normal settings PATCH, so it is audited and bumps the revision). Categories are shown under headings (`web_category_groups`). Block page texts and "Can this be switched off?" cover every category. See RESTRICTIONS.md.
 * **9 more data-protection rules, modelled on enterprise DLP dictionaries** (each a switch with its own action in Protection rules; existing accounts get them, On with the recommended action, at their next sync): crypto wallet private keys (Block), connection strings with passwords (Block), IBAN (Block, mod-97), Indian passport (Block, needs "passport" nearby), Indian bank account / IFSC (Warn), UPI IDs (Warn, known handles only), voter ID / EPIC (Warn, needs "voter"/"EPIC"/"election" nearby), GSTIN (Monitor, check character), internal IP addresses (Monitor). In both twins (`detector.ts` ↔ `detector.py`), 23 new shared cases incl. look-alikes that must not trigger, masked before anything leaves the browser or is stored (`ALWAYS_MASKED_RULES`). **Deploy the backend before the new extension**: extension 1.9.0 waits ("Protection rules loading") until the server sends all 17 rules.
 * **Page level on top of network level:** open tabs are sent to the block page when a website rule, category or unapproved-AI switch is turned On (no reload needed; `sweepOpenTabs`), back/forward-cache pages ask the service worker (`CHECK_PAGE`), using `shared/category-matcher.ts` (same decision as the network rules); text pasted or dropped into an AI prompt box is stopped at once when an enabled Block rule matches (`content.ts: checkInsertedText`).
 * **Dashboard fix (Protection rules):** after a click, a switch showed its old state until the page's refresh came back, and refreshes started by quick clicks could arrive out of order and put a switch back to an older state on screen (the server was always right). The page now shows the saved rule at once and always keeps the newest version of each rule (`PolicyEditor.tsx`). Checked by clicking every switch in the portal: 17 rules Off/On (34 clicks), 25 category and Safe Search switches (50), 4 quick settings, 10 website-rule Enabled/Disabled buttons, the unapproved-AI switch: every click matched on screen and in the extension's sync.
@@ -494,9 +906,9 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 * **One self-installing exe.** `agent/packaging` builds `AgentShield-Agent.exe` with PyInstaller (the backend detector/evaluator bundled in). Double-clicking it runs `install`: it asks for administrator rights, copies itself to Program Files, generates and trusts this PC's certificate, sets a PAC proxy for the AI domains only, registers a SYSTEM scheduled task that runs at startup, and asks for the activation code — no browser extension, no Developer mode. `uninstall` reverses it. CLI also has `connect` / `disconnect` / `status` / `new-ca` / `run`, and there is a built-in asyncio proxy plus a [mitmproxy](https://mitmproxy.org/) addon (`agent/mitm/agentshield_addon.py`) for running from source.
 * **Downloadable from the portal.** The server serves the exe at `GET /extension-updates/download/AgentShield-Agent.exe` (active plan required, 5-minute link, like the other downloads; `AGENT_PACKAGE_PATH`, default `dist-installer/AgentShield-Agent.exe`), `/extension-updates/info` reports `downloads.network_agent`, and the **Download** page now offers exactly two options: **AgentShield for Windows (.exe)** = the Network Agent (every browser, no extension) and the **extension .zip** (Load unpacked, one browser). The older extension-installer card (`AgentShield-System-Setup.exe`) is no longer shown on the Download page; its download route and the Windows app flow in **Connect browser** are unchanged. Covered by `test_distribution.py`.
 * **Production placement.** Like the Windows setup exe, the agent exe is served from the backend image: committed at `backend/release/AgentShield-Agent.exe` (Render copies `backend/` into the image) and pointed to by `AGENT_PACKAGE_PATH` in `render.yaml` (`/app/release/AgentShield-Agent.exe`) and `docker-compose.prod.yml` (`/srv/agentshield-dist/AgentShield-Agent.exe`, the mounted `dist-installer`). Rebuild the exe (`agent/packaging/agentshield-agent.spec`) and copy it to both `dist-installer/` and `backend/release/` when it changes.
-* **Making it un-bypassable is an IT step, not agent code** (the same as the extension force-install): trust the per-PC certificate and set a locked, AI-domain-only PAC proxy through **Group Policy or Intune**, and run the agent service as SYSTEM. These apply only to managed devices — the constraint every comparable product (Zscaler, Netskope) also has. Steps in [agent/README.md](./agent/README.md) "Make it stick".
+* **Making it un-bypassable is an IT step, not agent code** (the same as the extension force-install): trust the per-PC certificate and set a locked, AI-domain-only PAC proxy through **Group Policy or Intune**, and run the agent service as SYSTEM. These apply only to managed devices — the constraint every comparable product (Zscaler, Netskope) also has. Steps in agent/README.md "Make it stick".
 * **Tests:** `agent/tests` (23 tests) run the **real backend in-process** (so the connect / session / policy-sync / event flow is proven wire-compatible, not mocked) and drive the proxy over real sockets (TLS interception + in-flight redaction + blocking); no mitmproxy and no network needed. Run: `cd agent; ..\backend\.venv\Scripts\python.exe -m pytest tests -q`.
-* **Status:** extension unchanged and still passes; backend gains only the agent download route + Download-page card (backend 233 and dashboard build pass). The agent exe is built and smoke-tested (installs its commands, runs the proxy, loads the bundled detector), but the full install → every-browser flow is **not yet run on a clean real PC**, and the exe is **not code-signed** (SmartScreen will warn). Pilot it on one PC first. See [SECURITY_ARCHITECTURE.md](./SECURITY_ARCHITECTURE.md), [DATA_HANDLING.md](./DATA_HANDLING.md) and [agent/README.md](./agent/README.md).
+* **Status:** extension unchanged and still passes; backend gains only the agent download route + Download-page card (backend 233 and dashboard build pass). The agent exe is built and smoke-tested (installs its commands, runs the proxy, loads the bundled detector), but the full install → every-browser flow is **not yet run on a clean real PC**, and the exe is **not code-signed** (SmartScreen will warn). Pilot it on one PC first. See [SECURITY_ARCHITECTURE.md](./SECURITY_ARCHITECTURE.md), [DATA_HANDLING.md](./DATA_HANDLING.md) and agent/README.md.
 
 ### 2.4.6 — Faster start-up (slow first sign-in on the free Render plan) (2026-10-19)
 * **Cause:** the live backend runs on Render's free plan, which sleeps after ~15 minutes idle; the next request (often a sign-in) waits until the container has booted and the backend's start-up has finished. The awake server answers in under a second (measured: `/health` 0.1 s, `/auth/login` 0.5 s).
@@ -556,7 +968,7 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 * **Block page redesign** (`extension/blocked.html`, `blocked.js`): same look as the security notice (blue brand bar, red status band, amber for "activation required", incident table with website, category, policy rule, set by and local time, "Why is this blocked?" box, "Go back" button). The website row is hidden for category blocks (the address is not known there). Removed the random "Incident reference" (it matched no record) and the "Logged for security review" line (not every block is logged); reporting itself is unchanged.
 * **Extension popup redesign** (`src/popup/popup.html`, `popup.css`; `popup.ts` unchanged, every element id kept): navy header with the status pill, a "Current plan" card with the days / free checks / credits counter, an **Account** card, an **Active protection** card (block / warn / mask rule counts, website rules, policy version, last synced), **Sync policies** as the main button, the privacy note, and a footer with the extension version and session renewal time. Activation, plan-ended and paused screens use the same style. The header and main buttons use the portal's blue gradient (white status pill with a green / amber / red dot), the text uses Segoe UI Variable with lighter weights, and spacing is tighter so the active view fits without scrolling.
 * **One Free card:** on **Account & plan**, individual accounts now see a single **Free** card in two steps instead of separate "Free" and "Free trial" cards: **1. Full trial** (days, browsers, once per person; status Available / Active · ends date / Used / Confirm your email first) and **2. Free forever** (monthly checks and browsers from the `free` plan; status Starts <trial end> / Active / Paused until <date> / When your plan ends), with the Start free trial button. Company workspaces keep the trial card on its own ("once per company"). The seeded trial feature text "30 days, once per company" is now "30 days, once per account"; existing databases get the new text on startup only if the old default was never edited in **Plans & pricing** (`seed.py: ensure_plans`).
-* **Vercel-ready frontends:** `dashboard/`, `admin-console/` and `website/` each have a `vercel.json` (Vite build, `dist`, single-page fallback, security headers; the console also sends `noindex`). Their `vite.config.ts` stops a Vercel build (`VERCEL` set) when `VITE_API_BASE_URL` (portal, console) or `VITE_PORTAL_URL` (website) is missing; local builds are unchanged. The backend is not suited to Vercel (long-running reminder loop, in-memory anti-replay cache and rate limits, package files on disk): host it from `backend/Dockerfile`. Step by step: [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md). `.gitignore` also excludes `.vercel/` and `*.log`.
+* **Vercel-ready frontends:** `dashboard/`, `admin-console/` and `website/` each have a `vercel.json` (Vite build, `dist`, single-page fallback, security headers; the console also sends `noindex`). Their `vite.config.ts` stops a Vercel build (`VERCEL` set) when `VITE_API_BASE_URL` (portal, console) or `VITE_PORTAL_URL` (website) is missing; local builds are unchanged. The backend is not suited to Vercel (long-running reminder loop, in-memory anti-replay cache and rate limits, package files on disk): host it from `backend/Dockerfile`. Step by step: DEPLOY_VERCEL.md. `.gitignore` also excludes `.vercel/` and `*.log`.
 * **Minified extension builds:** `node extension/build.js` now minifies the service worker, content scripts and popup script (short names, no comments or source file names); `--watch` and `--readable` keep plain output for debugging. This only makes the shipped code harder to follow: anything in a browser extension can be read, so nothing secret may be put in it, and enforcement stays on the server (device keys, server-issued sessions, entitlement checked on every request). To stop people changing or removing the extension on company PCs, force-install it by browser policy and turn off developer mode (`ExtensionDeveloperModeSettings`), see DEPLOYMENT.md. The download package (`dist-installer/package/`, built by `scripts/packaging/pack-extension.js`) was rebuilt as 1.7.2. **Fix:** browsers kept handing out a cached 1.2.2 zip because the download address never changed; downloads now use a new link each time (below), `/extension-updates/info` is fetched with `cache: 'no-store'`, and the zip is served with `Cache-Control: no-cache`.
 * **Download needs an active plan:** `POST /api/v1/me/download-link {file}` (signed-in account) returns a 5-minute link only when the account may connect a browser (active trial, paid plan, credits or Free plan; otherwise 403 with the usual `NO_LICENSE` / `LICENSE_EXPIRED` / … code). `/extension-updates/download/agentshield-extension.zip` and `/AgentShield-System-Setup.exe` now refuse requests without such a link (401 `DOWNLOAD_LINK_REQUIRED`) and re-check the plan when it is used. The Download page shows "The download unlocks once your account has an active plan" with a locked button until then; the Deployment page uses the same links. Activation codes were already refused without a plan (button disabled on Connect browser). `updates.xml`, the `.crx` and `/info` stay public because browsers fetch them for policy installs; nothing works without activation anyway. Tests: `test_distribution.py`.
 * **Internal console Overview with charts:** new `GET /internal/api/analytics?days=7..180` (`metrics.read`, default 30): sign-ups per UTC day (individual / company), metered prompt checks per day (blocked / warned / redacted), security-event actions and categories, active browsers by browser and operating system, the 8 accounts with the most prompt checks this month (names only for staff with `companies.read`), users by role, individual owners confirmed / unconfirmed, referrals by status. Counts only: no prompt text, sites or email addresses. The console Overview now shows six headline numbers, a 7 / 30 / 90-day range picker, ten charts (sign-ups, prompt checks, accounts by plan, account types, protection outcomes, what was detected, top accounts, browsers, operating systems, users by role) and the full figure tiles below. Charts reuse the portal's components (`admin-console/src/charts.tsx`); long ranges show about eight date labels. Covered by `test_platform_analytics` and the permission matrix in `test_internal.py`.
@@ -603,8 +1015,8 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 * **Internal console:** the Companies page is now **Accounts** (type filter, usage this month, 60-day usage, credit history, **Add credits** as an owner-only audited exception `platform.credits_exception`, **Remove credits** with `licenses.manage`, `platform.credits_adjust`); new **Platform health** page (`GET /internal/api/health`); Overview metrics add accounts by type, prompt checks, credits outstanding/sold and net revenue this month; **Plans & pricing** edits credits per pack and included checks per month. Credit packs cannot be granted as licences.
 * **Extension 1.5.0:** `CREDITS_ACTIVE` unlocks (popup "Pay as you go" with the checks left); `USAGE_LIMIT`, `SPEND_CAP` and `NO_CREDITS` lock but keep the browser's activation; the service worker sends `client_event_id` with every event.
 * **Configuration:** new `COMPANY_SIGNUP_ENABLED` (false) and `CREDITS_DEVICE_LIMIT` (3); `.env.production.example` lists them. **Fix:** `docker-compose.prod.yml` and `docker-compose.supabase.yml` now pass `DASHBOARD_URL`, `SIGNUP_ENABLED`, `COMPANY_SIGNUP_ENABLED`, `TRIAL_DAYS`, `CREDITS_DEVICE_LIMIT`, `SMTP_*`, `RAZORPAY_*` and `BILLING_SELLER_*` to the backend container (previously missing from the compose files).
-* **Migration:** `backend/migrations/2026_10_individual_launch.sql` (after `2026_10_internal_console.sql`): `organizations.account_type/credit_balance/monthly_check_cap`, `users.display_name`, `security_events.client_event_id`, `plans.credits/check_limit`, tables `usage_daily`, `credit_ledger`, `api_tokens` (RLS enabled), and the `credits_1000` pack (price unset). Operators then set the pack's price and **Offered for sale** in **Plans & pricing**, and optionally included checks on trial/paid plans. Upgrade steps in [DEPLOYMENT.md §7](./DEPLOYMENT.md#7-upgrades).
-* **Tests:** new `backend/tests/test_individual.py` (15 tests); `test_signup_flow` and `test_signup_creates_own_individual_account` (formerly `test_signup_creates_own_company_admin`) updated for individual sign-up with email confirmation before the trial; backend 185 passed on a fresh SQLite DB; extension 73 passed + activation round-trip OK; all builds OK. See [TESTING.md](./TESTING.md#results-at-version-210-17-october-2026).
+* **Migration:** `backend/migrations/2026_10_individual_launch.sql` (after `2026_10_internal_console.sql`): `organizations.account_type/credit_balance/monthly_check_cap`, `users.display_name`, `security_events.client_event_id`, `plans.credits/check_limit`, tables `usage_daily`, `credit_ledger`, `api_tokens` (RLS enabled), and the `credits_1000` pack (price unset). Operators then set the pack's price and **Offered for sale** in **Plans & pricing**, and optionally included checks on trial/paid plans. Upgrade steps in DEPLOYMENT.md §7.
+* **Tests:** new `backend/tests/test_individual.py` (15 tests); `test_signup_flow` and `test_signup_creates_own_individual_account` (formerly `test_signup_creates_own_company_admin`) updated for individual sign-up with email confirmation before the trial; backend 185 passed on a fresh SQLite DB; extension 73 passed + activation round-trip OK; all builds OK. See TESTING.md.
 * **Limits:** metering counts only what activated extensions report (a modified extension could under-report; prompts that are never reported cannot be seen, but protection stops server-side when access ends); the offline queue holds at most 500 events; the usage month is the UTC calendar month; no proration; no invoices beyond payment receipts; Company onboarding (seats, departments, company sign-up) is not open yet.
 
 ### 2.0.0 — Internal admin console, staff roles and MFA (Phase A) (2026-10-17)
@@ -617,8 +1029,8 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 * **SUPERADMIN removed:** existing SUPERADMIN customer accounts are converted to ADMIN of their own company (startup and migration); they no longer open platform pages. Customer roles are ADMIN, VIEWER, EMPLOYEE (Phase B adds Company Owner / Security Manager, seats, departments).
 * **No built-in credentials:** no default admin, no default `SECRET_KEY` (required in production; random per process in development). `INITIAL_ADMIN_EMAIL` / `INITIAL_ADMIN_PASSWORD` are optional with no defaults; both are needed to create the first customer company (which then gets the internal licence). The demo auditor exists only with `DEMO_AUDITOR_PASSWORD` (never in production). New `test_no_hardcoded_secrets.py` scans shipped source; the old published passwords may appear only in the deny-lists in `api/auth.py` and `core/config.py`. `SUPABASE_SETUP.sql` now warns that its demo accounts are for local testing only.
 * **Configuration:** new `STAFF_TOKEN_HOURS`, `STAFF_MFA_KEY`, `ADMIN_CONSOLE_URL`, `DEMO_AUDITOR_PASSWORD`; development CORS includes `http://localhost:5175`; the production compose files pass `ADMIN_CONSOLE_URL` and `STAFF_MFA_KEY` and no longer require the initial admin.
-* **Migration:** `backend/migrations/2026_10_internal_console.sql` (after `2026_10_saas_phase2.sql`). Upgrade steps in [DEPLOYMENT.md §7](./DEPLOYMENT.md#7-upgrades).
-* **Tests:** new `backend/tests/test_internal.py` (sign-in and MFA, token separation, permission matrix, licence exceptions, staff management, bootstrap, audit, cross-company protection) and `test_no_hardcoded_secrets.py`; `conftest.py` supplies throwaway test-only environment values (the tests no longer use the passwords published by older releases). Results: backend 170 passed on a fresh SQLite DB, extension 71 passed, all builds OK, and a manual browser walkthrough of the console; see [TESTING.md](./TESTING.md#results-at-version-200-17-october-2026).
+* **Migration:** `backend/migrations/2026_10_internal_console.sql` (after `2026_10_saas_phase2.sql`). Upgrade steps in DEPLOYMENT.md §7.
+* **Tests:** new `backend/tests/test_internal.py` (sign-in and MFA, token separation, permission matrix, licence exceptions, staff management, bootstrap, audit, cross-company protection) and `test_no_hardcoded_secrets.py`; `conftest.py` supplies throwaway test-only environment values (the tests no longer use the passwords published by older releases). Results: backend 170 passed on a fresh SQLite DB, extension 71 passed, all builds OK, and a manual browser walkthrough of the console; see TESTING.md.
 * **Not yet (Phases B–D):** customer analytics, support tooling and operations pages; WebAuthn for staff; shared (multi-process) lockout and rate limits.
 
 ### 1.5.1 — Sign-up without email confirmation (2026-10-17)
@@ -665,7 +1077,7 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 
 ### 1.2.2 — Portal downloads & install guide (October 2026)
 * The portal (Deployment & Settings) offers **Download installer (.exe)** and **Download extension (.zip)**, served by the backend at `/extension-updates/download/...` (`SYSTEM_SETUP_PATH`, `EXTENSION_PACKAGE_DIR`); the packager also writes `agentshield-extension.zip`.
-* New [INSTALL.md](./INSTALL.md): end-to-end setup guide.
+* New INSTALL.md: end-to-end setup guide.
 * New brand icon (glowing blue "A" shield on a dark rounded tile) across the extension (`extension/icons/*`, `icon.ico` used by the installers) and the dashboard (`favicon.ico`, `logo.png`, `logo-512.png`).
 * Dashboard refresh: slimmer top bar (brand, organization, policy version, user), sticky sidebar with an animated active indicator, softer card shadows, and subtle page/card animations via `framer-motion` (disabled when the OS asks for reduced motion). The Overview setup card lists only the steps still open.
 * Docker compose files mount `dist-installer/` and pass `PUBLIC_BASE_URL`, `INITIAL_ORG_NAME`, `DEMO_MODE` and store IDs; admin credentials are now required (no default password). nginx proxies `/extension-updates/`.

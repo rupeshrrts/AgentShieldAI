@@ -81,13 +81,11 @@ def _path(url):
     return url.replace("https://agentshield.example.com", "")
 
 
-def test_downloads_need_a_link_from_an_account_with_a_plan(client, package, tmp_path, monkeypatch):
-    agent_exe = tmp_path / "AgentShield-Agent.exe"
-    monkeypatch.setattr(settings, "AGENT_PACKAGE_PATH", str(agent_exe))
+def test_downloads_need_a_link_from_an_account_with_a_plan(client, package):
     _, email = create_company(trial=True)
     user = login(client, email)
     info = client.get("/extension-updates/info").json()
-    assert info["downloads"] == {"extension_zip": False, "network_agent": False}
+    assert info["downloads"] == {"extension_zip": False}
     link = _link(client, user, "agentshield-extension.zip")
     assert link.status_code == 200 and link.json()["expires_in"] == 300
     assert client.get(_path(link.json()["url"])).status_code == 404  # package not built yet
@@ -99,24 +97,17 @@ def test_downloads_need_a_link_from_an_account_with_a_plan(client, package, tmp_
         res = client.get(path)
         assert res.status_code == 401 and res.json()["detail"]["code"] == "DOWNLOAD_LINK_REQUIRED", path
     zip_url = _path(_link(client, user, "agentshield-extension.zip").json()["url"])
-    assert client.get(zip_url.replace("agentshield-extension.zip", "AgentShield-Agent.exe")).status_code == 401
+    assert client.get(zip_url.replace("agentshield-extension.zip", "AgentShield-Agent.exe")).status_code == 404
     # A customer session token is not a download link
     assert client.get("/extension-updates/download/agentshield-extension.zip?t=" + user["Authorization"].split()[1]).status_code == 401
 
     z = client.get(zip_url)
     assert z.status_code == 200 and z.content.startswith(b"PK")
     assert "agentshield-extension-1.2.1.zip" in z.headers["content-disposition"]
-    # The retired Windows setup (2.6) is no longer offered or served
-    assert _link(client, user, "AgentShield-System-Setup.exe").status_code == 422
-    assert client.get("/extension-updates/download/AgentShield-System-Setup.exe").status_code == 404
-
-    # Network Agent installer: needs a link, and is served once built
-    assert client.get("/extension-updates/download/AgentShield-Agent.exe").status_code == 401
-    agent_exe.write_bytes(b"MZfake-agent-exe")
-    assert client.get("/extension-updates/info").json()["downloads"]["network_agent"] is True
-    ag = client.get(_path(_link(client, user, "AgentShield-Agent.exe").json()["url"]))
-    assert ag.status_code == 200 and ag.content.startswith(b"MZ")
-    assert "AgentShield-Agent.exe" in ag.headers["content-disposition"]
+    # The retired Windows setup (2.6) and Network Agent (2.6.1) are no longer offered or served
+    for exe in ("AgentShield-System-Setup.exe", "AgentShield-Agent.exe"):
+        assert _link(client, user, exe).status_code == 422
+        assert client.get(f"/extension-updates/download/{exe}").status_code == 404
 
 
 def test_no_download_link_without_a_plan(client, package):

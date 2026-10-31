@@ -15,8 +15,8 @@ const WEBSITE_URL: string | null =
   import.meta.env.VITE_WEBSITE_URL || (import.meta.env.DEV ? 'http://localhost:5172' : null);
 
 // Internal admin console for AgentShieldAI staff (its own app and accounts). Only a link: customer
-// accounts cannot sign in there. In development it runs on :5175; a production build shows the link
-// only when VITE_ADMIN_CONSOLE_URL is set.
+// accounts cannot sign in there. In development it runs on :5175; the Vercel build requires
+// VITE_ADMIN_CONSOLE_URL (vite.config.ts), so the link is always shown in production.
 const ADMIN_CONSOLE_URL: string | null =
   import.meta.env.VITE_ADMIN_CONSOLE_URL || (import.meta.env.DEV ? 'http://localhost:5175' : null);
 

@@ -108,5 +108,7 @@ export const api = {
   inviteStaff: (email: string, role: string, name?: string) => request<StaffMember & { delivery: string }>('/internal/api/staff/invite', post({ email, role, name })),
   updateStaff: (id: string, updates: { role?: string; active?: boolean }) => request<StaffMember>(`/internal/api/staff/${id}`, patch(updates)),
   resetStaffMfa: (id: string) => request<StaffMember>(`/internal/api/staff/${id}/reset-mfa`, post()),
+  resetStaffPassword: (id: string) =>
+    request<StaffMember & { temporary_password: string }>(`/internal/api/staff/${id}/reset-password`, post()),
   endStaffSessions: (id: string) => request<StaffMember>(`/internal/api/staff/${id}/end-sessions`, post()),
 };

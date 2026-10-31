@@ -97,6 +97,22 @@ export const App: React.FC = () => {
             })}>
             Sign out everywhere
           </button>
+          <button type="button" className="btn-link" style={{ color: '#e0f2fe', fontSize: 12 }}
+            onClick={() => openDialog({
+              title: 'Change your password', message: 'At least 14 characters. Your other console sessions end; this one continues.',
+              fields: [
+                { name: 'current', label: 'Current password', type: 'password', minLength: 1 },
+                { name: 'next', label: 'New password', type: 'password', minLength: 14 },
+                { name: 'confirm', label: 'Confirm new password', type: 'password', minLength: 14 },
+              ],
+              confirmLabel: 'Change password',
+              onConfirm: async (v) => {
+                if (v.next !== v.confirm) throw new Error('The new passwords do not match.');
+                signedIn(await auth.changePassword(v.current, v.next));
+              },
+            })}>
+            Change password
+          </button>
         </div>
       </aside>
       <main className="main">

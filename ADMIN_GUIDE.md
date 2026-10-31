@@ -1,6 +1,6 @@
 # AgentShield — Administrator Guide
 
-Day-to-day use of the dashboard (customer portal), plus the internal admin console used by AgentShieldAI staff. Installation and hosting are in [DEPLOYMENT.md](./DEPLOYMENT.md).
+Day-to-day use of the dashboard (customer portal), plus the internal admin console used by AgentShieldAI staff. Installation and hosting are in [DEPLOY_STEPS.md](./DEPLOY_STEPS.md).
 
 ---
 
@@ -16,7 +16,7 @@ Platform administration is **not** a customer role any more (since 2.0). The for
 
 **Account types (2.1).** Every customer account is either an **Individual** account or a **Company** workspace; each has its own rules, events and browsers, and accounts never see each other's data.
 
-* **Individual (available now):** **Create an account** on the dashboard's sign-in page (optional name, email, password) creates a one-person account with that person as its **Admin** and signs them in straight away. A confirmation link is emailed; the email must be confirmed before the free trial can start (plans and credits can be bought without it). The person's own walkthrough is in [USER_SETUP.md](./USER_SETUP.md).
+* **Individual (available now):** **Create an account** on the dashboard's sign-in page (optional name, email, password) creates a one-person account with that person as its **Admin** and signs them in straight away. A confirmation link is emailed; the email must be confirmed before the free trial can start (plans and credits can be bought without it). The person's own walkthrough is in [README.md → User setup](./README.md#user-setup).
 * **Company workspace (coming soon):** the sign-up page shows **Company** as *Coming soon*, and the server refuses company sign-ups (403 `COMPANY_COMING_SOON`) unless `COMPANY_SIGNUP_ENABLED=true`. Company workspaces created before 2.1 (and the initial company created from `INITIAL_ADMIN_EMAIL`) keep every company feature: an admin's email invite (**Users & Devices → Invite someone**) adds a person to the admin's own company as EMPLOYEE, VIEWER or ADMIN. Employees must not use **Create an account**: that creates a separate individual account.
 
 Company management (users, invites, other people's browsers) is hidden for individual accounts and refused by the server (403 `COMPANY_FEATURE_UNAVAILABLE` on `/api/v1/org/users`, invites and devices); their sidebar shows **Company workspace** with a *Soon* badge instead.
@@ -29,8 +29,8 @@ Everyone, including admins, needs an account to activate a browser, and the acco
 2. **Overview → Finish setup** lists what is left. Each item disappears only when the backend confirms it. The **Account & plan** page also has a 4-step checklist.
 3. **Change your password** (Deployment & Settings) if needed. A red banner shows while a published default password is in use.
 4. **Pick a preset** (Data Protection Rules). Start with **Monitor only** for a week to see what employees do without interrupting them, then switch to **Recommended**.
-5. **Invite your team** (Users & Devices → **Invite someone**). Email must be configured on the server (`SMTP_...` in `.env`; see [DEPLOYMENT.md](./DEPLOYMENT.md)).
-6. **Activate a test browser** (**Download** page → install, then My activation → **Generate activation code**, then the extension popup) and run the **Guided Demo** (demo mode) or the tests in [TESTING.md](./TESTING.md).
+5. **Invite your team** (Users & Devices → **Invite someone**). Email must be configured on the server (`SMTP_...` in `.env`; see [DEPLOY_STEPS.md](./DEPLOY_STEPS.md)).
+6. **Activate a test browser** (**Download** page → install, then My activation → **Generate activation code**, then the extension popup) and run the **Guided Demo** (demo mode) or the tests in [README.md → Testing](./README.md#testing).
 
 An individual account follows the same idea with a personal sidebar: **Account & plan**, **Download**, **Connect browser**, **Overview**, **Security alerts**, **Usage & credits**, **Protection rules**, **Website controls**, **API connections**, **Profile & security**, **Test a prompt**, **Coverage & limits** and **Company workspace** (*Soon*).
 
@@ -79,7 +79,7 @@ A separate web app on its own address (e.g. `https://admin.yourcompany.com`; dev
 
 **Signing in:** email and password, then a 6-digit code from an authenticator app, or one of your recovery codes. At the first sign-in you scan a QR code (or type the manual key) into your authenticator app, enter a code, are shown **10 recovery codes once** (store them safely; each works once), and must replace your temporary password with one of at least 14 characters. Sessions last 8 hours (`STAFF_TOKEN_HOURS`). Five wrong passwords lock the email for 15 minutes. **Sign out everywhere** (sidebar) ends all your console sessions.
 
-**First owner:** there is no built-in staff login. The first platform owner is created on the server with `python -m app.cli create-platform-owner --email you@yourcompany.com` (run in `backend/` with the production `DATABASE_URL` and `SECRET_KEY`); it prints a temporary password once and refuses if an owner already exists unless `--force`. See [INSTALL.md 1.8](./INSTALL.md#18-create-the-first-internal-console-account-platform-owner).
+**First owner:** there is no built-in staff login. The first platform owner is created on the server with `python -m app.cli create-platform-owner --email you@yourcompany.com` (run in `backend/` with the production `DATABASE_URL` and `SECRET_KEY`); it prints a temporary password once and refuses if an owner already exists unless `--force`. See [DEPLOY_STEPS.md](./DEPLOY_STEPS.md).
 
 **Staff roles** (full permission table in the README, "Authentication model"):
 
@@ -154,9 +154,9 @@ Each rule has an **action**, a **severity** (for sorting and risk scores) and an
 | Monitor | Nothing visible | Yes |
 | Allow | Nothing visible | No violation (prompt counted only) |
 
-The strictest action of all matching rules wins. A rule that is **Off** is not enforced at all. Built-in rules cannot be deleted (turn them Off instead). Changes reach connected browsers within about a minute, or immediately when the employee clicks **Sync Policies**. Every kind of restriction on one page: [RESTRICTIONS.md](./RESTRICTIONS.md). The **Protected Browsers** page shows which browsers have the latest policy version.
+The strictest action of all matching rules wins. A rule that is **Off** is not enforced at all. Built-in rules cannot be deleted (turn them Off instead). Changes reach connected browsers within about a minute, or immediately when the employee clicks **Sync Policies**. Every kind of restriction on one page: [README.md → What is blocked and allowed](./README.md#what-is-blocked-and-allowed). The **Protected Browsers** page shows which browsers have the latest policy version.
 
-Rules: credentials & keys, emails, phone numbers, payment cards, PAN, Aadhaar, confidential keywords, file uploads; since 2.6 also crypto wallet keys, connection strings with passwords, IBAN, Indian bank accounts (IFSC), UPI IDs, passport, voter ID, GSTIN and internal IP addresses (details and defaults: [RESTRICTIONS.md](./RESTRICTIONS.md)).
+Rules: credentials & keys, emails, phone numbers, payment cards, PAN, Aadhaar, confidential keywords, file uploads; since 2.6 also crypto wallet keys, connection strings with passwords, IBAN, Indian bank accounts (IFSC), UPI IDs, passport, voter ID, GSTIN and internal IP addresses (details and defaults: [README.md → What is blocked and allowed](./README.md#what-is-blocked-and-allowed)).
 
 ## Confidential keywords
 
@@ -234,7 +234,7 @@ Deployment & Settings → Privacy & retention.
 | "Use your work email address" on sign-up | The domain is not in `SIGNUP_ALLOWED_DOMAINS`; invite the person instead if they should have access. |
 | "This account already has 3 browsers" | The user signs one out in My activation, or you **Revoke** an old one. |
 | Browsers stopped working after upgrading to 1.3 | Expected: enrollment codes and device keys were retired. Invite users (or let them sign up) and have each browser activated. `LEGACY_DEVICE_KEYS_ENABLED=true` re-accepts old keys temporarily, for emergencies only. |
-| Many "Not seen today" | Extensions disabled or removed. Use force-install (DEPLOYMENT.md §6A). |
+| Many "Not seen today" | Extensions disabled or removed. Use force-install (DEPLOY_STEPS.md). |
 | Events missing for an employee | Their browser is offline; events are queued (up to 500) and arrive after the next sync. |
 | "Too many failed sign-in attempts" | Wait 15 minutes; check the audit log for `login.failed` from unexpected IP addresses. |
 | A legitimate prompt is blocked | Check which rule fired (event detail). Remove a too-broad keyword, or lower that rule to Warn/Monitor. |

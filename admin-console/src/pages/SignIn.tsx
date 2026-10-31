@@ -25,6 +25,7 @@ export const SignIn: React.FC<{ inviteToken: string | null; onSignedIn: (s: Staf
   const [invite, setInvite] = useState<{ email: string; role_label: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [forgot, setForgot] = useState(false);
 
   useEffect(() => {
     if (inviteToken) auth.inviteInfo(inviteToken).then(setInvite).catch((e) => setError(e.message));
@@ -106,9 +107,19 @@ export const SignIn: React.FC<{ inviteToken: string | null; onSignedIn: (s: Staf
               <input id="email" className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div>
-              <label className="label" htmlFor="password">Password</label>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <label className="label" htmlFor="password">Password</label>
+                <button type="button" className="btn-link" onClick={() => setForgot(!forgot)}>Forgot password?</button>
+              </div>
               <input id="password" className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
+            {forgot && (
+              <Alert kind="info">
+                Staff passwords are not reset by email. Ask a platform owner to reset it (<strong>Staff &amp; roles → Reset password</strong>);
+                you get a one-time password to change at sign-in. If you are the only platform owner, run on the server or a PC with
+                its database settings: <code>python -m app.cli reset-staff-password --email you@company.com</code> (in <code>backend</code>).
+              </Alert>
+            )}
             <Alert kind="error">{error}</Alert>
             <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Checking...' : 'Continue'}</button>
             <p className="card-note">Lost your authenticator? Ask a platform owner to reset it, or use a recovery code at the next step.</p>
@@ -183,7 +194,7 @@ export const SignIn: React.FC<{ inviteToken: string | null; onSignedIn: (s: Staf
   );
 };
 
-/** Shown after sign-in when the account still has a temporary password (bootstrap). */
+/** Shown after sign-in when the account still has a temporary password (new owner or a password reset). */
 export const ChangePassword: React.FC<{ onDone: (s: StaffSession) => void; onSignOut: () => void }> = ({ onDone, onSignOut }) => {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -211,7 +222,7 @@ export const ChangePassword: React.FC<{ onDone: (s: StaffSession) => void; onSig
       <form className="auth-card" onSubmit={submit}>
         <div>
           <h1>Replace your temporary password</h1>
-          <p className="page-sub">This account was created with a one-time password. Choose your own before using the console.</p>
+          <p className="page-sub">This account has a one-time password. Choose your own before using the console.</p>
         </div>
         <div>
           <label className="label" htmlFor="cur">Temporary password</label>

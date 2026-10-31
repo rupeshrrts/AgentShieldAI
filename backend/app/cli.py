@@ -5,7 +5,8 @@
 
 create-platform-owner creates the first internal PLATFORM_OWNER with a random temporary password, printed once.
 The owner must change it and set up an authenticator app at first sign-in to the internal console.
-reset-staff-password is the recovery path for a forgotten staff password (the console has no self-service reset):
+reset-staff-password is the recovery path for a forgotten staff password when no other platform owner can use the
+console's Staff & roles -> Reset password (there is no self-service or email reset for staff):
 it sets a new temporary password (printed once, must be changed at next sign-in) and ends that account's
 sessions; --reset-mfa also removes the authenticator and recovery codes so a new one is set up at sign-in.
 It needs shell access to the server and its database, which is the trust boundary for both commands.
@@ -16,6 +17,7 @@ import secrets
 import sys
 
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 
 from app.core.audit import record_admin_action
 from app.core.permissions import OWNER
@@ -89,6 +91,16 @@ def main(argv=None) -> int:
     r.add_argument("--email", required=True)
     r.add_argument("--reset-mfa", action="store_true", help="Also remove the authenticator (set up again at sign-in)")
     args = parser.parse_args(argv)
+    try:
+        return _run(args)
+    except OperationalError as exc:
+        print(f"Error: cannot connect to the database in DATABASE_URL ({str(exc.orig).splitlines()[0]}).", file=sys.stderr)
+        print("Check DATABASE_URL in .env (for Supabase: Connect -> Transaction pooler, with the current database "
+              "password). Nothing was changed.", file=sys.stderr)
+        return 1
+
+
+def _run(args) -> int:
     if args.command == "reset-staff-password":
         try:
             temporary = reset_staff_password(args.email, args.reset_mfa)

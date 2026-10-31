@@ -6,7 +6,9 @@ serving local static assets for development testing.
 """
 
 import asyncio
+import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -14,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
 from app.api import (
     api_tokens,
@@ -42,6 +45,8 @@ from app.core.notifications import reminder_loop
 from app.db.seed import init_db
 from app.db.session import Base, SessionLocal, engine
 
+logger = logging.getLogger("agentshield.startup")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,16 +56,7 @@ async def lifespan(app: FastAPI):
     environments start with a ready-to-use tenant, admin account and baseline
     policies, and deletes events older than each organization's retention period.
     """
-    # Startup must be quick: a free host that wakes up holds the first request (e.g. a sign-in) until the
-    # server is ready, and every statement here is a round trip to the database.
-    missing = set(Base.metadata.tables) - set(inspect(engine).get_table_names())
-    if missing:
-        Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        init_db(db)
-    finally:
-        db.close()
+    _prepare_database()
     # Retention clean-up runs after the server is accepting requests (it also runs periodically on ingestion)
     purge_task = asyncio.create_task(asyncio.to_thread(_purge_expired_events))
     # Trial/expiry reminders (informational; access is enforced on every request)
@@ -69,6 +65,34 @@ async def lifespan(app: FastAPI):
     purge_task.cancel()
     if reminder_task:
         reminder_task.cancel()
+
+
+def _prepare_database(attempts: int = 5) -> None:
+    """Creates missing tables and runs the seed.
+
+    Right after a deploy or a wake-up the database (e.g. Supabase's pooler) can refuse the first connections
+    for a moment, so connection errors are retried a few times (about 20 s in total) before giving up. If it
+    still fails the server does not start; Render then keeps the previous version live.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            # Startup must be quick: a free host that wakes up holds the first request (e.g. a sign-in) until the
+            # server is ready, and every statement here is a round trip to the database.
+            missing = set(Base.metadata.tables) - set(inspect(engine).get_table_names())
+            if missing:
+                Base.metadata.create_all(bind=engine)
+            db = SessionLocal()
+            try:
+                init_db(db)
+            finally:
+                db.close()
+            return
+        except OperationalError as exc:
+            if attempt == attempts:
+                logger.error("Database unreachable at startup; check DATABASE_URL. Last error: %s", exc.orig)
+                raise
+            logger.warning("Database not reachable yet (attempt %d of %d): %s", attempt, attempts, exc.orig)
+            time.sleep(2 * attempt)
 
 
 def _purge_expired_events() -> None:

@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowRight, BadgeCheck, Building2, ChevronDown, Chrome, Eye, FileLock2, Gauge, Globe2, KeyRound, Lock, Menu,
+  ArrowRight, BadgeCheck, Building2, Chrome, Eye, FileLock2, Gauge, Globe2, KeyRound, Lock, Menu,
   ShieldCheck, Sparkles, UserRound, X, Zap,
 } from 'lucide-react';
 import { BrowserMock, HeroShield } from './Art';
@@ -10,50 +10,7 @@ import { BrowserMock, HeroShield } from './Art';
 const PORTAL = ((import.meta.env.VITE_PORTAL_URL as string | undefined) || 'http://localhost:5173').replace(/\/$/, '');
 const SIGNUP_URL = `${PORTAL}/#signup`;
 const LOGIN_URL = `${PORTAL}/#signin`;
-// Internal admin console for AgentShieldAI staff (own app, own accounts with MFA). Only a link; a
-// production build shows it only when VITE_ADMIN_CONSOLE_URL is set.
-const ADMIN_URL: string | null =
-  (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) || (import.meta.env.DEV ? 'http://localhost:5175' : null);
-
-// "Log in" button; with an admin console address it opens a small menu: customer portal or staff console.
-const LoginMenu: React.FC = () => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onClick); document.removeEventListener('keydown', onKey); };
-  }, [open]);
-
-  if (!ADMIN_URL) return <a className="btn btn-ghost" href={LOGIN_URL}>Log in</a>;
-  return (
-    <div className="login-menu" ref={ref}>
-      <button type="button" className="btn btn-ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        Log in <ChevronDown size={16} className={`chev ${open ? 'up' : ''}`} />
-      </button>
-      {open && (
-        <div className="login-pop" role="menu" aria-label="Log in">
-          <span className="lp-head">Log in to AgentShieldAI</span>
-          <a role="menuitem" href={LOGIN_URL}>
-            <span className="lp-icon"><UserRound size={18} /></span>
-            <span className="lp-text"><strong>Log in as user</strong><small>Your dashboard and alerts</small></span>
-            <ArrowRight size={16} className="lp-go" />
-          </a>
-          <a role="menuitem" href={ADMIN_URL}>
-            <span className="lp-icon lp-admin"><ShieldCheck size={18} /></span>
-            <span className="lp-text"><strong>Log in as admin</strong><small>AgentShieldAI staff · MFA required</small></span>
-            <ArrowRight size={16} className="lp-go" />
-          </a>
-          <span className="lp-foot">New here? <a href={SIGNUP_URL}>Create a free account</a></span>
-        </div>
-      )}
-    </div>
-  );
-};
+// "Log in" opens the portal's sign-in page; staff reach the admin console from its "Site owner? Admin login" link.
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -94,10 +51,9 @@ export const App: React.FC = () => {
               <a className="btn btn-ghost" href={LOGIN_URL}>Log in</a>
               <a className="btn btn-primary" href={SIGNUP_URL}>Sign up free</a>
             </div>
-            {ADMIN_URL && <a className="nav-admin-mobile" href={ADMIN_URL}><ShieldCheck size={15} /> Log in as admin</a>}
           </nav>
           <div className="nav-cta">
-            <LoginMenu />
+            <a className="btn btn-ghost" href={LOGIN_URL}>Log in</a>
             <a className="btn btn-primary" href={SIGNUP_URL}>Sign up free <ArrowRight size={16} /></a>
           </div>
           <button className="menu-btn" aria-label={menu ? 'Close menu' : 'Open menu'} onClick={() => setMenu(!menu)}>
@@ -278,7 +234,6 @@ export const App: React.FC = () => {
           <nav aria-label="Footer">
             <a href="#features">Features</a><a href="#how">How it works</a><a href="#plans">Plans</a>
             <a href={LOGIN_URL}>Log in</a><a href={SIGNUP_URL}>Sign up</a>
-            {ADMIN_URL && <a href={ADMIN_URL}>Admin log in</a>}
           </nav>
           <span className="copy">© {new Date().getFullYear()} AgentShieldAI</span>
         </div>

@@ -27,7 +27,7 @@ export const Alert: React.FC<{ kind: 'error' | 'success' | 'info'; children: Rea
 export interface PromptField {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'select';
+  type?: 'text' | 'number' | 'password' | 'select';
   options?: { value: string; label: string }[];
   initial?: string;
   minLength?: number;

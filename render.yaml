@@ -32,5 +32,3 @@ services:
         sync: false            # portal and console addresses, comma separated, no trailing slash
       - key: EXTENSION_PACKAGE_DIR
         value: /app/release/package   # built extension (backend/release/package), offered on the portal's Download page
-      - key: AGENT_PACKAGE_PATH
-        value: /app/release/AgentShield-Agent.exe          # Network Agent installer (every browser, no extension), offered on Download

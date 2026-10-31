@@ -1,5 +1,0 @@
-# PyInstaller build output and packaged bundles (rebuild from the .spec)
-build/
-dist/
-*.zip
-AgentShield-Agent-*/

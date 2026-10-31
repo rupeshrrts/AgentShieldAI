@@ -63,7 +63,7 @@ function run(cmd, cmdArgs, cwd, label) {
   const [c, a] = spawnArgs(cmd, cmdArgs);
   const r = spawnSync(c, a, { cwd, env, stdio: 'inherit', shell: needsShell(cmd) });
   if (r.status !== 0) {
-    console.error(`\n${label} failed. Check that Python 3.10+ and Node.js 18+ are installed.`);
+    console.error(`\n${label} failed. Check that Python 3.11+ and Node.js 18+ are installed.`);
     process.exit(1);
   }
 }

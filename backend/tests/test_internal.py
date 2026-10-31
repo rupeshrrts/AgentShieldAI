@@ -343,6 +343,36 @@ def test_mfa_reset_forces_new_enrolment(client):
     assert step["step"] == "mfa_setup"
 
 
+def test_owner_resets_a_forgotten_password(client):
+    owner_id, _, _ = create_staff("PLATFORM_OWNER")
+    owner = _bearer(create_access_token(subject=owner_id, expires_delta=timedelta(hours=1), extra_claims={"typ": "staff", "sv": 0}))
+    staff_id, email, _ = create_staff("SUPPORT_AGENT")  # authenticator already set up
+    token = create_access_token(subject=staff_id, expires_delta=timedelta(hours=1), extra_claims={"typ": "staff", "sv": 0})
+
+    res = client.post(f"/internal/api/staff/{staff_id}/reset-password", headers=owner)
+    assert res.status_code == 200 and res.json()["must_change_password"] is True
+    temporary = res.json()["temporary_password"]
+    assert len(temporary) >= 20
+    assert client.get("/internal/auth/me", headers=_bearer(token)).status_code == 401  # sessions ended
+    assert client.post("/internal/auth/login", json={"email": email, "password": STAFF_PASSWORD}).status_code == 401
+    step = client.post("/internal/auth/login", json={"email": email, "password": temporary}).json()
+    assert step["step"] == "mfa" and step["must_change_password"] is True  # authenticator still required
+    assert ("staff.password_reset", "staff") in _audit_actions_of_target(email)
+
+    # Not for your own account (use Change password), not for unknown ids, and only with staff.manage
+    assert client.post(f"/internal/api/staff/{owner_id}/reset-password", headers=owner).status_code == 400
+    assert client.post("/internal/api/staff/missing/reset-password", headers=owner).status_code == 404
+    assert client.post(f"/internal/api/staff/{staff_id}/reset-password", headers=staff_headers("PLATFORM_ADMIN")).status_code == 403
+
+
+def _audit_actions_of_target(email: str) -> list:
+    db = SessionLocal()
+    try:
+        return [(a.action, a.actor_type) for a in db.query(AdminAuditLog).filter(AdminAuditLog.target_id == email).all()]
+    finally:
+        db.close()
+
+
 # --- Cross-tenant protection of customer APIs ----------------------------------------------
 
 def test_company_admin_cannot_touch_another_companys_objects(client):

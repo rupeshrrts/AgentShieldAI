@@ -90,7 +90,6 @@ def distribution_info(request: Request):
         },
         "downloads": {
             "extension_zip": (_package_dir() / "agentshield-extension.zip").is_file(),
-            "network_agent": Path(settings.AGENT_PACKAGE_PATH).is_file(),
         },
     }
 
@@ -111,21 +110,6 @@ def _check_download_link(t: Optional[str], file: str, db: Session) -> None:
     if not ent.allowed:
         code, message = DENIAL_CODES.get(ent.state, DENIAL_CODES["NONE"])
         raise HTTPException(status_code=403, detail={"code": code, "message": message})
-
-
-@router.get("/download/AgentShield-Agent.exe")
-def download_network_agent(t: Optional[str] = Query(default=None), db: Session = Depends(get_db)):
-    """The Network Agent installer: one self-installing exe that protects every browser and desktop AI
-    app on a PC with no extension and no Developer mode. Needs an active plan, like the other downloads."""
-    _check_download_link(t, "AgentShield-Agent.exe", db)
-    path = Path(settings.AGENT_PACKAGE_PATH)
-    if not path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="The Network Agent installer has not been built on this server. See agent/packaging (build the .spec).",
-        )
-    return FileResponse(path, media_type="application/vnd.microsoft.portable-executable",
-                        filename="AgentShield-Agent.exe", headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/download/agentshield-extension.zip")

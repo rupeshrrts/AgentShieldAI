@@ -1,7 +1,8 @@
-"""Internal staff management (platform owner only): invite, change role, disable, reset MFA, end sessions.
+"""Internal staff management (platform owner only): invite, change role, disable, reset password or MFA, end sessions.
 
 The last active platform owner can never be demoted or disabled, so the platform always has one.
 """
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,7 +16,7 @@ from app.core.audit import record_admin_action
 from app.core.config import settings
 from app.core.email import EmailNotConfigured, send_email
 from app.core.permissions import OWNER, STAFF_ROLE_LABELS, STAFF_ROLES, require_staff
-from app.core.security import generate_secret, hash_device_key
+from app.core.security import generate_secret, hash_device_key, hash_password
 from app.db.models import StaffInvite, StaffRecoveryCode, StaffUser
 from app.db.session import get_db
 
@@ -153,6 +154,26 @@ def reset_mfa(staff_id: str, request: Request, owner: StaffUser = Depends(manage
     db.commit()
     _audit(db, owner, "staff.mfa_reset", target, f"Reset the authenticator of {target.email}", request)
     return _out(db, target)
+
+
+@router.post("/{staff_id}/reset-password")
+def reset_password(staff_id: str, request: Request, owner: StaffUser = Depends(manage), db: Session = Depends(get_db)):
+    """For a forgotten password: a new temporary password, returned once to the owner to hand over. The person must
+    change it at their next sign-in (the authenticator is still required); their sessions end."""
+    target = db.query(StaffUser).filter(StaffUser.id == staff_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Staff member not found.")
+    if target.id == owner.id:
+        raise HTTPException(status_code=400, detail="Use Change password for your own account.")
+    if not target.password_hash:
+        raise HTTPException(status_code=400, detail="This person has not accepted their invite yet.")
+    temporary = secrets.token_urlsafe(18)
+    target.password_hash = hash_password(temporary)
+    target.must_change_password = True
+    target.session_version = (target.session_version or 0) + 1
+    db.commit()
+    _audit(db, owner, "staff.password_reset", target, f"Reset the password of {target.email} (temporary password)", request)
+    return {**_out(db, target), "temporary_password": temporary}
 
 
 @router.post("/{staff_id}/end-sessions")

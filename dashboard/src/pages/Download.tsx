@@ -50,7 +50,7 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
   const sha = info?.zip_sha256 || release?.sha256 || null;
   const live = devices.filter((d) => d.status !== 'REVOKED');
 
-  const download = async (file: 'agentshield-extension.zip' | 'AgentShield-Agent.exe') => {
+  const download = async (file: 'agentshield-extension.zip') => {
     setDlError('');
     setDownloading(true);
     try {
@@ -69,44 +69,7 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // The browser extension (Chrome Web Store / Edge Add-ons, or the .zip) is the way to install AgentShield; it needs
-  // no Windows program. The optional Network Agent (a separate Windows program) is listed after it.
-  const windowsWay = (
-    <>
-  {info?.downloads?.network_agent && (
-    <section className="glass-panel" style={{ padding: '24px' }}>
-      <SectionHeader icon={<Monitor size={18} />} title="Optional: AgentShield Network Agent for Windows" right={<span className="chip">Not needed for the extension</span>}>
-        One program protects AI sites in <strong>every</strong> browser on this PC — Chrome, Edge, Brave, Opera and Firefox — and in
-        desktop AI apps. No browser extension, no Developer mode, no Load unpacked. It checks only AI sites; all other browsing is
-        untouched. The PC uses one device of your plan.
-      </SectionHeader>
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', margin: '4px 0 14px' }}>
-        {locked ? (
-          <button type="button" className="btn-primary" disabled title="Needs an active plan">
-            <Lock size={15} /> Download locked: no active plan
-          </button>
-        ) : (
-          <button type="button" className="btn-primary" disabled={downloading} onClick={() => download('AgentShield-Agent.exe')}>
-            <DownloadIcon size={15} /> {downloading ? 'Starting download...' : 'Download for Windows (.exe)'}
-          </button>
-        )}
-      </div>
-      <ol className="steps" style={{ marginLeft: 18 }}>
-        <li>
-          In <button type="button" className="link-btn" onClick={() => onNavigate('activation')}>Connect browser</button>, click{' '}
-          <strong>Generate activation code</strong> and copy the code.
-        </li>
-        <li>Run <strong>AgentShield-Agent.exe</strong>, click <strong>Yes</strong> when Windows asks for permission, and paste the code when it asks.</li>
-        <li>Restart your browsers. AI sites are now protected everywhere on this PC — no extension, no Developer mode.</li>
-      </ol>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 10 }}>
-        The agent is not code-signed yet, so Windows SmartScreen may show &ldquo;more info &rarr; run anyway&rdquo; on first run.
-        Remove it any time: run <code>AgentShield-Agent.exe uninstall</code> as administrator.
-      </p>
-    </section>
-  )}
-    </>
-  );
+  // The browser extension (Chrome Web Store / Edge Add-ons, or the .zip) is the way to install AgentShield
   const extensionWay = (
     <>
   <section className="glass-panel" style={{ padding: '24px' }}>
@@ -208,9 +171,7 @@ export const Download: React.FC<{ onNavigate: (tab: NavTab) => void; individual?
       )}
       {dlError && <div className="callout callout-warning">{dlError}</div>}
 
-      {/* The extension first; the optional Network Agent after it */}
       {extensionWay}
-      {windowsWay}
 
       {/* Connection status */}
       <section className="glass-panel" style={{ padding: '24px' }}>

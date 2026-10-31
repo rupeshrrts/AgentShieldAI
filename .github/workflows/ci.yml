@@ -12,14 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        # Same Python as backend/Dockerfile (what Render runs)
+        python-version: ["3.14"]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -31,9 +32,11 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Pytest Suite
+        env:
+          DATABASE_URL: sqlite:///./test_agentshield.db
         run: |
           cd backend
-          pytest -v
+          python -m pytest -q
 
   dashboard-build:
     name: Frontend Build & Typecheck (Dashboard)
@@ -41,12 +44,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
           cache-dependency-path: dashboard/package-lock.json
 
@@ -66,12 +69,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
           cache-dependency-path: extension/package-lock.json
 

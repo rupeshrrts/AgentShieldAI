@@ -20,6 +20,9 @@ export const Staff: React.FC<{ me: StaffMe; openDialog: OpenDialog }> = ({ me, o
   const [roles, setRoles] = useState<{ role: string; label: string }[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // A reset password is returned once; it is shown here until the owner dismisses it
+  const [temporary, setTemporary] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const load = () => api.staff().then((r) => { setRows(r.staff); setRoles(r.roles); }).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
@@ -44,6 +47,19 @@ export const Staff: React.FC<{ me: StaffMe; openDialog: OpenDialog }> = ({ me, o
         })}><UserPlus size={14} /> Invite staff</button>} />
       <Alert kind="error">{error}</Alert>
       <Alert kind="success">{notice}</Alert>
+      {temporary && (
+        <section className="card card-pad stack">
+          <div className="cell-main">Temporary password for {temporary.email}</div>
+          <div className="card-note">Shown only now. Give it to them privately; they must choose a new password at their next sign-in (their authenticator is still required).</div>
+          <div className="row">
+            <span className="tag mono" style={{ wordBreak: 'break-all' }}>{temporary.password}</span>
+            <button type="button" className="btn btn-sm" onClick={() => navigator.clipboard.writeText(temporary.password).then(() => setCopied(true))}>
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => { setTemporary(null); setCopied(false); }}>Done</button>
+          </div>
+        </section>
+      )}
       <section className="card">
         <div className="table-wrap">
           <table className="data">
@@ -69,6 +85,18 @@ export const Staff: React.FC<{ me: StaffMe; openDialog: OpenDialog }> = ({ me, o
                           fields: [{ name: 'role', label: 'Role', type: 'select', initial: s.role, options: roleOptions }],
                           confirmLabel: 'Change role', onConfirm: async (v) => { await api.updateStaff(s.id, { role: v.role }); done('Role changed.'); },
                         })}>Role</button>
+                        {!s.invite_pending && (
+                          <button type="button" className="btn-link" onClick={() => openDialog({
+                            title: `Reset the password of ${s.email}?`,
+                            message: 'For a forgotten password. You get a one-time temporary password to give them; their sessions end and they choose a new password at their next sign-in.',
+                            confirmLabel: 'Reset password', danger: true, onConfirm: async () => {
+                              const r = await api.resetStaffPassword(s.id);
+                              setCopied(false);
+                              setTemporary({ email: r.email, password: r.temporary_password });
+                              done('Password reset.');
+                            },
+                          })}>Reset password</button>
+                        )}
                         {s.mfa_enabled && (
                           <button type="button" className="btn-link" onClick={() => openDialog({
                             title: `Reset two-step verification for ${s.email}?`, message: 'For a lost phone. They must set up a new authenticator at their next sign-in.',
