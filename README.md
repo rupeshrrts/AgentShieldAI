@@ -769,15 +769,15 @@ The backend tests need **no credentials in code or in `.env`**: `backend/tests/c
 | `test_internal.py` | Internal console: MFA before any session, single-use TOTP and recovery codes, lockout, forced password change, bootstrap command, token separation, the permission matrix for every role, owner-only licence/credit exceptions, staff invites and role changes |
 | `test_no_hardcoded_secrets.py` | Shipped source contains no live keys, private keys, device keys, codes or tokens, and no `os.getenv` default for any password/secret/key/token setting |
 
-### Latest results (extension 1.10.1, verified 2026-11-25)
+### Latest results (extension 1.10.2, verified 2026-11-25)
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
-| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **303 passed** |
-| Extension unit | `cd extension; npm test` | **163 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
+| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **304 passed**; one staff MFA timing test failed and passed on an isolated rerun |
+| Extension unit | `cd extension; npm test` | **165 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
 | Dashboard | `cd dashboard; npm run build` | passes |
-| Portal ZIP | `node scripts/packaging/pack-extension.js --portal-zip` | 1.10.1 archive, manifest version and checksum verified |
-| **Real browser** | `cd extension; npm run test:e2e` | Credential On/Off checks passed on Microsoft Edge 158. The local server connection reset later in the website category checks. |
+| Portal ZIP | `node scripts/packaging/pack-extension.js --portal-zip` | 1.10.2 archive, manifest version, checksum and popup links verified |
+| **Real browser (1.10.1)** | `cd extension; npm run test:e2e` | Credential On/Off checks passed on Microsoft Edge 158. The local server connection reset later in the website category checks. |
 
 The real-browser test starts the backend on a throwaway SQLite file with a random test admin, loads the unpacked test build (`node build.js --e2e`) in a temporary Edge profile with DNS off except 127.0.0.1, activates it with a real single-use code, then switches each control through the dashboard's API and checks the browser: every protection rule and file uploads Off → sent, On → Block / Warn / Redact; the paste check; each of the 24 categories On → blocked, Off → open; an already-open tab blocked when its category is switched On; Kids preset and All off; Safe Search; unapproved AI; website rules; one change applied by the extension's own once-a-minute check without a manual sync. **Not covered:** Google Chrome (branded Chrome 137+ refuses `--load-extension`; the package is the same), a manual run on a clean PC, and the real AI websites (their layouts are covered by the selectors in `adapters/chatgpt.ts`, not by this test).
 
@@ -861,6 +861,11 @@ No automated Google Chrome run (only Edge); no manual run on a clean PC yet; pay
 Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limitations-not-enforced): Chromium browsers only; employees can remove an extension unless it is force-installed by policy; PDF/Office/image content is not inspected; pattern-based detection can miss rephrased data; site layout changes can disable prompt checks on that site; customer accounts use email + password (no SSO/MFA; staff have TOTP MFA but no hardware-key/WebAuthn option); the staff session token is in `sessionStorage`, so an XSS in the console would expose it (the console loads no third-party scripts, only Google Fonts); the internal console has no customer analytics, support or further operations pages yet (Phases B–D); INTERNAL licences still exist for the initial company created from `INITIAL_ADMIN_*`; sign-up signs in before the email is confirmed, so someone can register an address they do not own (the trial still needs the confirmation link) until the owner takes it over with Forgot password; usage metering counts only what activated extensions report (a modified extension could under-report, and the server cannot see prompts that are never reported, but protection stops server-side when access ends); the offline event queue is capped at 500 events; the usage month is the UTC calendar month; credits never expire and there are no invoices beyond payment receipts; Company features are hidden and refused for individual accounts (existing company tenants keep them); a user with developer mode can edit a self-installed extension to skip the activation screen (the server still refuses it); lockout/rate-limit counters (customer and staff) are per-process memory; no automatic deletion of the admin audit log; the dashboard loads Google Fonts; Vite 5 dev-server advisories (dev only); payment receipts are not GST tax invoices; no proration when switching plans; reconciliation covers one-time orders only (monthly charges rely on webhooks).
 
 ## Change history
+
+### Extension 1.10.2 — Standalone underscore-prefixed secret keys (2026-11-25)
+
+* The portal ZIP opens the hosted dashboard by default. **My activation** opens the activation page after sign-in. To package for a different portal, set `AGENTSHIELD_DASHBOARD_URL` before running `pack-extension.js --portal-zip`.
+* The API credentials rule now recognizes standalone `sk_` keys with 32–64 letters or digits after the prefix. Matching values are masked in audit text and blocked when the server rule is enabled with the Block action.
 
 ### Extension 1.10.1 — API credential coverage (2026-11-25)
 

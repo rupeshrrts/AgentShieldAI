@@ -1,11 +1,11 @@
 {
   "id": "ahdfdohnhdlppjhnppbhecggfjceaalc",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "sha256": "158c79e3b11da5a380ab5550a3e345db35b3bea267f2888275ed7f8d9a4da259",
   "size": 4183732,
-  "zip_sha256": "b33966b5c3078e002e462650d9174adef2223b604a3225d4722977c528bd14cd",
-  "zip_size": 4183526,
+  "zip_sha256": "caea78e0bf0904e2b3a775ccf500e3ea5f39955aa6fd797403d632fd3e73ba63",
+  "zip_size": 4183596,
   "files": 41,
-  "built_at": "2026-11-25T09:02:50.023Z",
+  "built_at": "2026-11-25T12:04:33.319Z",
   "crx_version": "1.9.0"
 }

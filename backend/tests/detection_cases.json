@@ -20,6 +20,8 @@
     { "text": "sk-ant-api03-Synthetic_fixture_0123456789-", "rules": ["secret.api_key_like"] },
     { "text": "sk-svcacct-Synthetic_fixture_0123456789_", "rules": ["secret.api_key_like"] },
     { "text": "sk-SyntheticFixtureABCDEFGHIJKLMNOPQRSTUVWXYZ", "rules": ["secret.api_key_like"] },
+    { "text": "sk_abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef", "rules": ["secret.api_key_like"] },
+    { "text": "sk_short", "rules": [] },
     { "text": "xai-Synthetic_fixture_0123456789", "rules": ["secret.api_key_like"] },
     { "text": "pplx-Synthetic_fixture_0123456789", "rules": ["secret.api_key_like"] },
     { "text": "hf_Synthetic_fixture_0123456789", "rules": ["secret.api_key_like"] },

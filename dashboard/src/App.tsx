@@ -49,13 +49,13 @@ const INVITE_TOKEN_FROM_URL = tokenFromUrl('invite');
 const VERIFY_TOKEN_FROM_URL = tokenFromUrl('verify');
 const RESET_TOKEN_FROM_URL = tokenFromUrl('reset');
 
-/** Where each role lands after signing in. */
-const homeTab = (_role?: string): NavTab => 'account';
+/** Open the activation page from the browser popup, including after sign-in. */
+const homeTab = (): NavTab => window.location.hash === '#activation' ? 'activation' : 'account';
 
 export const App: React.FC = () => {
   // Session state initialized from persistent localStorage
   const [session, setSession] = useState<UserSession | null>(() => api.getStoredSession());
-  const [activeTab, setActiveTab] = useState<NavTab>(() => homeTab(api.getStoredSession()?.role));
+  const [activeTab, setActiveTab] = useState<NavTab>(homeTab);
   const [inviteToken, setInviteToken] = useState<string | null>(INVITE_TOKEN_FROM_URL);
   const [verifyToken, setVerifyToken] = useState<string | null>(VERIFY_TOKEN_FROM_URL);
   const [resetToken, setResetToken] = useState<string | null>(RESET_TOKEN_FROM_URL);
@@ -147,7 +147,7 @@ export const App: React.FC = () => {
   };
 
   const signedIn = (s: UserSession) => {
-    setActiveTab(homeTab(s.role));
+    setActiveTab(homeTab());
     setSession(s);
   };
 

@@ -137,7 +137,7 @@ class DetectorEngine:
         re.compile(r"(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])", re.IGNORECASE | re.ASCII),
         re.compile(r"\bsk-demo-[A-Za-z0-9_-]{10,}\b", re.IGNORECASE),
         re.compile(r"\bsk-(?:proj|live|test|ant|svcacct)-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"),
-        re.compile(r"\bsk-[A-Za-z0-9]{32,64}(?![A-Za-z0-9_-])"),
+        re.compile(r"\bsk[-_][A-Za-z0-9]{32,64}(?![A-Za-z0-9_-])"),
         re.compile(r"\b(?:xai-|pplx-|hf_)[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"),
         re.compile(r"\bAKIA[0-9A-Z]{12,20}\b"),  # AWS Access Key ID
         re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{36,}\b"),  # GitHub Personal Access Tokens

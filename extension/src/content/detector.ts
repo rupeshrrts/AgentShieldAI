@@ -109,7 +109,7 @@ export class LocalDetector {
     /(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])/gi,
     /\bsk-demo-[A-Za-z0-9_-]{10,}\b/gi,
     /\bsk-(?:proj|live|test|ant|svcacct)-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g,
-    /\bsk-[A-Za-z0-9]{32,64}(?![A-Za-z0-9_-])/g,
+    /\bsk[-_][A-Za-z0-9]{32,64}(?![A-Za-z0-9_-])/g,
     /\b(?:xai-|pplx-|hf_)[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g,
     /\bAKIA[0-9A-Z]{12,20}\b/g,
     /\bgh[pousr]_[A-Za-z0-9_]{36,}\b/g,

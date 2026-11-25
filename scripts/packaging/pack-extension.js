@@ -23,6 +23,7 @@ const root = path.resolve(__dirname, '..', '..');
 const extDir = path.join(root, 'extension');
 const outDir = path.join(root, 'dist-installer', 'package');
 const keyPath = path.join(root, 'keys', 'agentshield-extension.pem');
+const publicPortalUrl = 'https://agent-shield-ai-chi.vercel.app';
 
 // Runtime files only
 const INCLUDE = [
@@ -166,7 +167,11 @@ function main() {
     const id = extensionIdFromSpki(Buffer.from(manifest.key, 'base64'));
     if (id !== release.id) throw new Error('Extension ID does not match the existing portal release');
 
-    execFileSync(process.execPath, [path.join(extDir, 'build.js')], { cwd: extDir, stdio: 'inherit' });
+    execFileSync(process.execPath, [path.join(extDir, 'build.js')], {
+      cwd: extDir,
+      stdio: 'inherit',
+      env: { ...process.env, AGENTSHIELD_DASHBOARD_URL: process.env.AGENTSHIELD_DASHBOARD_URL?.trim() || publicPortalUrl },
+    });
     const files = INCLUDE.flatMap(collect);
     const zip = makeZip(files);
     fs.writeFileSync(path.join(portalDir, 'agentshield-extension.zip'), zip);

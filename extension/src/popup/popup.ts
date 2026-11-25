@@ -6,6 +6,7 @@
  * status. Activated view: shown only when the service worker reports a live session that
  * the server issued; nothing here can unlock the extension by itself.
  */
+import { DEFAULT_DASHBOARD_URL } from '../shared/config';
 
 const BUSY_STATES = new Set(['CONNECTING', 'AUTHENTICATING']);
 
@@ -27,11 +28,14 @@ function setText(id: string, text: string) {
   if (e) e.textContent = text;
 }
 
-function openDashboard(url: string) {
-  if (url) chrome.tabs.create({ url });
+function openDashboard(url: string, activation: boolean) {
+  if (!url) return;
+  const target = new URL(url);
+  if (activation) target.hash = 'activation';
+  chrome.tabs.create({ url: target.href });
 }
 
-let dashboardUrl = '';
+let dashboardUrl = DEFAULT_DASHBOARD_URL;
 
 document.addEventListener('DOMContentLoaded', () => {
   setText('ext-version', 'v' + chrome.runtime.getManifest().version);
@@ -43,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const id of ['open-dashboard-1', 'open-dashboard-2', 'upgrade-btn', 'renew-link', 'paused-upgrade']) {
     el(id)?.addEventListener('click', (e) => {
       e.preventDefault();
-      openDashboard(dashboardUrl);
+      openDashboard(dashboardUrl, id === 'open-dashboard-2');
     });
   }
 
@@ -120,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function refreshStatus() {
   chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (res) => {
     if (chrome.runtime.lastError || !res) return;
-    dashboardUrl = res.dashboard_url || '';
+    dashboardUrl = res.dashboard_url || DEFAULT_DASHBOARD_URL;
 
     const authorized = Boolean(res.authorized);
     const state: string = res.auth_state || 'LOCKED';
