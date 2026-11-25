@@ -2,6 +2,7 @@
  * Builds and packages the browser extension for distribution.
  *
  *   node scripts/packaging/pack-extension.js
+ *   node scripts/packaging/pack-extension.js --portal-zip
  *
  * Output in dist-installer/package/ (served by the backend at /extension-updates/):
  *   agentshield.crx            Signed CRX3 package for self-hosted force-install (Chrome & Edge)
@@ -157,6 +158,31 @@ function collect(rel) {
 }
 
 function main() {
+  if (process.argv.includes('--portal-zip')) {
+    const portalDir = path.join(root, 'backend', 'release', 'package');
+    const releasePath = path.join(portalDir, 'release.json');
+    const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
+    const manifest = JSON.parse(fs.readFileSync(path.join(extDir, 'manifest.json'), 'utf8'));
+    const id = extensionIdFromSpki(Buffer.from(manifest.key, 'base64'));
+    if (id !== release.id) throw new Error('Extension ID does not match the existing portal release');
+
+    execFileSync(process.execPath, [path.join(extDir, 'build.js')], { cwd: extDir, stdio: 'inherit' });
+    const files = INCLUDE.flatMap(collect);
+    const zip = makeZip(files);
+    fs.writeFileSync(path.join(portalDir, 'agentshield-extension.zip'), zip);
+    fs.writeFileSync(releasePath, JSON.stringify({
+      ...release,
+      version: manifest.version,
+      crx_version: release.crx_version ?? release.version,
+      zip_sha256: crypto.createHash('sha256').update(zip).digest('hex'),
+      zip_size: zip.length,
+      files: files.length,
+      built_at: new Date().toISOString(),
+    }, null, 2) + '\n');
+    console.log(`Packaged portal ZIP ${manifest.version} (${files.length} files)`);
+    return;
+  }
+
   if (!fs.existsSync(keyPath)) {
     console.error(`Signing key not found: ${keyPath}\nRun: node scripts/packaging/new-extension-key.js`);
     process.exit(1);

@@ -864,6 +864,7 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
 
 ### Extension 1.10.0 — Standalone credential protection (2026-11-23)
 
+* The portal serves the 1.10.0 ZIP for manual installation. `node scripts/packaging/pack-extension.js --portal-zip` rebuilds the ZIP with the existing extension ID and preserves the version advertised for signed managed updates.
 * Added detection for long mixed letter-and-digit `Api-…` tokens and long `AQ.…` tokens under the existing credential rule.
 * Added a standalone password-like text rule. It starts at Warn and can be set to Block to stop matching pastes and submissions. Deploy the backend first so the new rule is available when the updated extension syncs.
 

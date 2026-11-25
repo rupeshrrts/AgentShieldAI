@@ -50,7 +50,9 @@ def _release() -> dict:
             detail="No extension package has been built. Run: node scripts/packaging/pack-extension.js",
         )
     data = json.loads(path.read_text(encoding="utf-8"))
-    if not _ID.match(data.get("id", "")) or not re.match(r"^[0-9.]+$", data.get("version", "")):
+    if (not _ID.fullmatch(data.get("id", ""))
+            or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,3}", data.get("version", ""))
+            or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,3}", data.get("crx_version", data.get("version", "")))):
         raise HTTPException(status_code=500, detail="release.json is invalid")
     return data
 
@@ -129,12 +131,13 @@ def download_extension_zip(t: Optional[str] = Query(default=None), db: Session =
 def update_manifest(request: Request):
     """Google Update protocol manifest used by Chrome and Edge to install/update the extension."""
     release = _release()
-    codebase = f"{_base_url(request)}/extension-updates/agentshield-{release['version']}.crx"
+    version = release.get("crx_version", release["version"])
+    codebase = f"{_base_url(request)}/extension-updates/agentshield-{version}.crx"
     xml = (
         "<?xml version='1.0' encoding='UTF-8'?>\n"
         "<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>\n"
         f"  <app appid={quoteattr(release['id'])}>\n"
-        f"    <updatecheck codebase={quoteattr(codebase)} version={quoteattr(release['version'])} />\n"
+        f"    <updatecheck codebase={quoteattr(codebase)} version={quoteattr(version)} />\n"
         "  </app>\n"
         "</gupdate>\n"
     )
@@ -145,7 +148,7 @@ def update_manifest(request: Request):
 def extension_package(version: str):
     """The signed extension package. The version in the URL keeps browser caches correct across updates."""
     release = _release()
-    if version != release["version"]:
+    if version != release.get("crx_version", release["version"]):
         raise HTTPException(status_code=404, detail="That version is not available.")
     path = _package_dir() / "agentshield.crx"
     if not path.exists():

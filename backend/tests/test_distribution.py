@@ -81,10 +81,21 @@ def _path(url):
     return url.replace("https://agentshield.example.com", "")
 
 
-def test_downloads_need_a_link_from_an_account_with_a_plan(client, package):
+@pytest.mark.parametrize("zip_version", ["1.2.1", "1.10.0"])
+def test_downloads_need_a_link_from_an_account_with_a_plan(client, package, zip_version):
+    if zip_version != "1.2.1":
+        release_path = package / "release.json"
+        release = json.loads(release_path.read_text())
+        release.update(version=zip_version, crx_version="1.2.1")
+        release_path.write_text(json.dumps(release))
+        manifest = ET.fromstring(client.get("/extension-updates/updates.xml").text)
+        assert manifest.find(".//{http://www.google.com/update2/response}updatecheck").get("version") == "1.2.1"
+        assert client.get("/extension-updates/agentshield-1.2.1.crx").status_code == 200
+        assert client.get(f"/extension-updates/agentshield-{zip_version}.crx").status_code == 404
     _, email = create_company(trial=True)
     user = login(client, email)
     info = client.get("/extension-updates/info").json()
+    assert info["version"] == zip_version
     assert info["downloads"] == {"extension_zip": False}
     link = _link(client, user, "agentshield-extension.zip")
     assert link.status_code == 200 and link.json()["expires_in"] == 300
@@ -103,7 +114,7 @@ def test_downloads_need_a_link_from_an_account_with_a_plan(client, package):
 
     z = client.get(zip_url)
     assert z.status_code == 200 and z.content.startswith(b"PK")
-    assert "agentshield-extension-1.2.1.zip" in z.headers["content-disposition"]
+    assert f"agentshield-extension-{zip_version}.zip" in z.headers["content-disposition"]
     # The retired Windows setup (2.6) and Network Agent (2.6.1) are no longer offered or served
     for exe in ("AgentShield-System-Setup.exe", "AgentShield-Agent.exe"):
         assert _link(client, user, exe).status_code == 422

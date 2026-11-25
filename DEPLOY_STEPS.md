@@ -511,6 +511,9 @@ Automated test suites: [README.md](./README.md#testing).
      **Extension releases**. Deploy the backend before handing out an extension that needs new server features.
   5. Force-installed copies update by themselves; Load-unpacked copies need the new zip and ↻ in
      `chrome://extensions`; store copies update after the store approves the new upload. Activations are kept.
+  For a portal-only ZIP update, run `node scripts/packaging/pack-extension.js --portal-zip` from the repository root.
+  It rebuilds the ZIP and metadata directly in `backend/release/package/` using the extension's existing public key.
+  The managed update feed continues to advertise the version of the signed CRX. Deploy the backend to publish the new ZIP.
 * **Older upgrade notes** (per version) are in [README.md](./README.md) "Change history".
 
 ## Uninstalling
