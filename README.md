@@ -773,7 +773,7 @@ The backend tests need **no credentials in code or in `.env`**: `backend/tests/c
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
-| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **284 passed** |
+| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **285 passed** |
 | Extension unit | `cd extension; npm test` | **145 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
 | Dashboard | `cd dashboard; npm run build` | passes |
 | Store packages | `node scripts/packaging/store-packages.js --allow-localhost` | Chrome and Edge test ZIPs built and passed validation |
