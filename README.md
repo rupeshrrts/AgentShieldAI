@@ -526,7 +526,7 @@ The catalog is `backend/app/core/catalog.py`. Detection exists twice (Python and
 
 ## What is blocked and allowed
 
-*For administrators:* every kind of restriction AgentShield applies, what each one blocks, what it lets through, and where it is switched (server 2.6, extension 1.9.0). Sources of truth in the code: `RULE_CATALOG`, `PRESETS`, `WEB_CATEGORIES`, `WEB_CATEGORY_PRESETS` and `KNOWN_AI_DOMAINS` in `backend/app/core/catalog.py`; `DEFAULT_DOMAINS` in `backend/app/db/seed.py`; `extension/src/shared/domains.ts`, `web-categories.json` and `extension/rulesets/`; the decision twins `extension/src/shared/policy.ts` ↔ `backend/app/policies/evaluator.py`.
+*For administrators:* every kind of restriction AgentShield applies, what each one blocks, what it lets through, and where it is switched. Sources of truth in the code: `RULE_CATALOG`, `PRESETS`, `WEB_CATEGORIES`, `WEB_CATEGORY_PRESETS` and `KNOWN_AI_DOMAINS` in `backend/app/core/catalog.py`; `DEFAULT_DOMAINS` in `backend/app/db/seed.py`; `extension/src/shared/domains.ts`, `web-categories.json` and `extension/rulesets/`; the decision twins `extension/src/shared/policy.ts` ↔ `backend/app/policies/evaluator.py`.
 
 **The basic rule:** a restriction applies only while it is **On** in the portal. Switch it **Off** and it does nothing. Changes reach connected browsers within about a minute (or at once with **Sync policies** in the extension popup).
 
@@ -547,7 +547,8 @@ Checked **inside the browser** before anything is sent, only on these AI sites: 
 
 | Rule | What it detects | Default action |
 | :--- | :--- | :--- |
-| API keys, tokens, passwords & private keys | OpenAI/Anthropic/AWS/GitHub/Google/Slack/Stripe keys, JWTs, PEM private keys, `password: …` | **Block** |
+| API keys, tokens, passwords & private keys | Recognized provider keys, long `Api-…` and `AQ.…` tokens, JWTs, PEM private keys, and labeled credentials | **Block** |
+| Standalone password-like text | A standalone value made of 3–32 letters, one of `@ ! # $ % & *`, and 4–16 digits | Warn. Set to **Block** to stop matching pastes and submissions. |
 | Email addresses | Any email address | Warn |
 | Phone numbers | 10+ digit numbers (Indian and North American) | Warn |
 | Payment card numbers | 13–19 digits that pass the Luhn check | **Block** |
@@ -768,15 +769,15 @@ The backend tests need **no credentials in code or in `.env`**: `backend/tests/c
 | `test_internal.py` | Internal console: MFA before any session, single-use TOTP and recovery codes, lockout, forced password change, bootstrap command, token separation, the permission matrix for every role, owner-only licence/credit exceptions, staff invites and role changes |
 | `test_no_hardcoded_secrets.py` | Shipped source contains no live keys, private keys, device keys, codes or tokens, and no `os.getenv` default for any password/secret/key/token setting |
 
-### Latest results (2.6.0 / extension 1.9.0; backend and extension re-run 2026-10-31)
+### Latest results (extension 1.10.0, verified 2026-11-25)
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
-| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **273 passed**; also passes with plain `pytest` (`backend/pytest.ini`) |
-| Extension unit | `cd extension; npm test` | **135 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
+| Backend | `cd backend; $env:DATABASE_URL="sqlite:///./test_agentshield.db"; .venv\Scripts\python.exe -m pytest tests -q` (fresh file) | **284 passed** |
+| Extension unit | `cd extension; npm test` | **145 passed**, activation round-trip OK; `npx tsc --noEmit` and `node build.js` pass |
 | Dashboard | `cd dashboard; npm run build` | passes |
-| Store packages | `node scripts/packaging/store-packages.js --api-url https://… --dashboard-url https://…` | all checks pass (2.6.0) |
-| **Real browser** | `cd extension; npm run test:e2e` | **121/121 passed** on Microsoft Edge 156, headless (2.6.0) |
+| Store packages | `node scripts/packaging/store-packages.js --allow-localhost` | Chrome and Edge test ZIPs built and passed validation |
+| **Real browser** | `cd extension; npm run test:e2e` | **128/128 passed** on Microsoft Edge 158, headless, on rerun. The initial run had one intermittent failure in the UPI rule-off check. |
 
 The real-browser test starts the backend on a throwaway SQLite file with a random test admin, loads the unpacked test build (`node build.js --e2e`) in a temporary Edge profile with DNS off except 127.0.0.1, activates it with a real single-use code, then switches each control through the dashboard's API and checks the browser: every protection rule and file uploads Off → sent, On → Block / Warn / Redact; the paste check; each of the 24 categories On → blocked, Off → open; an already-open tab blocked when its category is switched On; Kids preset and All off; Safe Search; unapproved AI; website rules; one change applied by the extension's own once-a-minute check without a manual sync. **Not covered:** Google Chrome (branded Chrome 137+ refuses `--load-extension`; the package is the same), a manual run on a clean PC, and the real AI websites (their layouts are covered by the selectors in `adapters/chatgpt.ts`, not by this test).
 
@@ -860,6 +861,11 @@ No automated Google Chrome run (only Edge); no manual run on a clean PC yet; pay
 Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limitations-not-enforced): Chromium browsers only; employees can remove an extension unless it is force-installed by policy; PDF/Office/image content is not inspected; pattern-based detection can miss rephrased data; site layout changes can disable prompt checks on that site; customer accounts use email + password (no SSO/MFA; staff have TOTP MFA but no hardware-key/WebAuthn option); the staff session token is in `sessionStorage`, so an XSS in the console would expose it (the console loads no third-party scripts, only Google Fonts); the internal console has no customer analytics, support or further operations pages yet (Phases B–D); INTERNAL licences still exist for the initial company created from `INITIAL_ADMIN_*`; sign-up signs in before the email is confirmed, so someone can register an address they do not own (the trial still needs the confirmation link) until the owner takes it over with Forgot password; usage metering counts only what activated extensions report (a modified extension could under-report, and the server cannot see prompts that are never reported, but protection stops server-side when access ends); the offline event queue is capped at 500 events; the usage month is the UTC calendar month; credits never expire and there are no invoices beyond payment receipts; Company features are hidden and refused for individual accounts (existing company tenants keep them); a user with developer mode can edit a self-installed extension to skip the activation screen (the server still refuses it); lockout/rate-limit counters (customer and staff) are per-process memory; no automatic deletion of the admin audit log; the dashboard loads Google Fonts; Vite 5 dev-server advisories (dev only); payment receipts are not GST tax invoices; no proration when switching plans; reconciliation covers one-time orders only (monthly charges rely on webhooks).
 
 ## Change history
+
+### Extension 1.10.0 — Standalone credential protection (2026-11-23)
+
+* Added detection for long mixed letter-and-digit `Api-…` tokens and long `AQ.…` tokens under the existing credential rule.
+* Added a standalone password-like text rule. It starts at Warn and can be set to Block to stop matching pastes and submissions. Deploy the backend first so the new rule is available when the updated extension syncs.
 
 ### 2.6.1 — Reliable backend deploys, a leaner repository and fewer documents (2026-10-31)
 * **Reported problem: the backend errored after the project was copied to another PC and pushed.** The code itself passes every test; what changed between PCs and pushes was the environment around it:

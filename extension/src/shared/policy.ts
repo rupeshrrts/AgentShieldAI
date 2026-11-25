@@ -8,7 +8,7 @@
  *     rule with no policy, is not enforced. Nothing falls back to a built-in default action.
  *   - Employee governance status can only make the result stricter.
  */
-import { Finding, PolicyAction, PolicyEvaluationResult, PolicyRule, SeverityLevel } from './types';
+import type { Finding, PolicyAction, PolicyEvaluationResult, PolicyRule, SeverityLevel } from './types';
 
 export const ACTION_PRIORITY: Record<PolicyAction, number> = {
   BLOCK: 5,
@@ -31,6 +31,7 @@ export const SEVERITY_WEIGHT: Record<SeverityLevel, number> = {
  */
 export const CATALOG_RULE_IDS: string[] = [
   'secret.api_key_like',
+  'secret.password_like',
   'pii.email',
   'pii.phone',
   'pii.credit_card',
@@ -154,6 +155,7 @@ export function evaluateFindings(
 /** Plain-language names shown to employees in alerts. */
 export const RULE_LABELS: Record<string, string> = {
   'secret.api_key_like': 'A password, API key or access token',
+  'secret.password_like': 'Text that looks like a password',
   'pii.email': 'An email address',
   'pii.phone': 'A phone number',
   'pii.credit_card': 'A payment card number',
@@ -175,6 +177,7 @@ export const RULE_LABELS: Record<string, string> = {
 /** What the employee should do next, shown in alerts. */
 export const RULE_ADVICE: Record<string, string> = {
   'secret.api_key_like': 'Remove the credential. If it was already shared anywhere, ask IT to rotate it.',
+  'secret.password_like': 'If this value is a password, remove it or replace it with a placeholder.',
   'pii.email': 'Remove or replace personal contact details with placeholders such as <customer email>.',
   'pii.phone': 'Remove or replace phone numbers with placeholders.',
   'pii.credit_card': 'Never paste card numbers into AI tools. Remove it before sending.',

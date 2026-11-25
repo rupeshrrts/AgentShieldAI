@@ -91,6 +91,8 @@ No plaintext invite token (customer or staff), confirmation-link token, password
 
 ## 5. Is sensitive content transmitted outside the browser?
 
+Detected `Api-…` and `AQ.…` tokens and standalone password-like values receive credential masking in audit text. This masking applies independently of the rule's enforcement action.
+
 | Event | Text sent | Default |
 | :--- | :--- | :--- |
 | Prompt that broke a rule (BLOCK / WARN / REDACT / MONITOR) | Prompt with **credentials, connection-string passwords, crypto wallet keys, card, Aadhaar, IBAN, bank account, passport and voter ID numbers masked** (2.6 adds the last six). Emails, phone numbers, PAN, UPI IDs, GSTIN, internal IP addresses and keywords are **not** masked in this text. For REDACT, the redacted text that was actually sent. | **On** ("Store text of prompts that broke a rule") |

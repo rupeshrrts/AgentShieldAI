@@ -23,6 +23,10 @@ def test_card_and_aadhaar_are_masked_for_storage():
     assert "[MASKED]" in masked
 
 
+def test_standalone_password_masking_preserves_surrounding_whitespace():
+    assert mask_secrets("  SampleUser@1234\n") == "  Samp****[MASKED]\n"
+
+
 @pytest.fixture
 def detector():
     return DetectorEngine()

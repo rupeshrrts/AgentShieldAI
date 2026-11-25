@@ -45,6 +45,7 @@ htmlcov/
 
 # Databases
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
 agentshield.db

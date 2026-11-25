@@ -23,9 +23,17 @@ RULE_CATALOG: List[dict] = [
         "rule_id": "secret.api_key_like",
         "category": "SECRET",
         "name": "API keys, tokens, passwords & private keys",
-        "description": "OpenAI/Anthropic/AWS/GitHub/Google/Slack/Stripe keys, JWTs, PEM private keys, and 'password: ...' style credentials.",
+        "description": "Recognized provider keys, long Api- and AQ. tokens, JWTs, PEM private keys, and labeled credentials.",
         "default_action": "BLOCK",
         "default_severity": "HIGH",
+    },
+    {
+        "rule_id": "secret.password_like",
+        "category": "SECRET",
+        "name": "Standalone password-like text",
+        "description": "A standalone sequence of letters, a symbol and digits. Set to Block to stop matching text from being pasted into an AI prompt.",
+        "default_action": "WARN",
+        "default_severity": "MEDIUM",
     },
     {
         "rule_id": "pii.email",

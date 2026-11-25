@@ -130,6 +130,8 @@ class DetectorEngine:
 
     # Pre-compiled regular expressions for high-throughput matching
     API_KEY_PATTERNS: List[re.Pattern] = [
+        re.compile(r"(?<![A-Za-z0-9_-])AQ\.[A-Za-z0-9_-]{40,100}(?![A-Za-z0-9_-])"),
+        re.compile(r"(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])", re.IGNORECASE | re.ASCII),
         re.compile(r"\bsk-demo-[A-Za-z0-9_-]{10,}\b", re.IGNORECASE),
         re.compile(r"\bsk-(?:proj|live|test|ant)-[A-Za-z0-9_-]{20,}\b"),
         re.compile(r"\bAKIA[0-9A-Z]{12,20}\b"),  # AWS Access Key ID
@@ -245,6 +247,11 @@ class DetectorEngine:
         for pattern in self.API_KEY_PATTERNS:
             for match in pattern.finditer(text):
                 findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
+
+        # A standalone name, symbol and digit sequence is ambiguous, so it has its own policy.
+        password_like = re.match(r"[ \t\r\n]*([A-Za-z]{3,32}[@!#$%&*][0-9]{4,16})(?=[ \t\r\n]*\Z)", text)
+        if password_like:
+            add_group("secret.password_like", "SECRET", "MEDIUM", password_like)
 
         # 1b. Connection strings with a real password, and crypto wallet private keys
         connection_spans = []

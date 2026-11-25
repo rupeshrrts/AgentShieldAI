@@ -238,7 +238,7 @@ async function main() {
 
     const policies = (await api(admin, 'GET', '/api/v1/policies')).policies;
     const byRule = Object.fromEntries(policies.map((p) => [p.rule_id, p]));
-    const setRule = (ruleId, enabled) => api(admin, 'PATCH', `/api/v1/policies/${byRule[ruleId].id}`, { enabled });
+    const setRule = (ruleId, enabled, action) => api(admin, 'PATCH', `/api/v1/policies/${byRule[ruleId].id}`, { enabled, action });
     const settings = (body) => api(admin, 'PATCH', '/api/v1/org/settings', body);
 
     // The documented test page (README: /test-bench), checked by the installed extension like any AI site
@@ -256,8 +256,10 @@ async function main() {
       })()`);
       await sleep(700);
       const out = await tab.eval(`({ sent: document.querySelectorAll('#chat-messages .msg-user').length,
-        modal: (document.querySelector('.agentshield-modal-box') || { className: '' }).className })`);
+        modal: (document.querySelector('.agentshield-modal-box') || { className: '' }).className,
+        subtitle: document.querySelector('.agentshield-modal-subtitle')?.textContent })`);
       await tab.close();
+      if (out.subtitle === 'Activation required' || out.subtitle === 'Protection rules loading') return out.subtitle;
       if (out.modal.includes('modal-block')) return 'BLOCK';
       if (out.modal.includes('modal-warn')) return 'WARN';
       if (out.modal.includes('modal-redact')) return 'REDACT';
@@ -301,6 +303,7 @@ async function main() {
     // 1. Protection rules: all Off -> nothing is enforced
     const SAMPLES = {
       'secret.api_key_like': ['my key sk-demo-EXAMPLE123456789', 'BLOCK'],
+      'secret.password_like': ['SampleUser@1234', 'WARN'],
       'pii.email': ['mail demo.user@example.com today', 'WARN'],
       'pii.phone': ['call me on (555) 234-5678', 'WARN'],
       'pii.credit_card': ['card 4111 1111 1111 1111', 'BLOCK'],
@@ -343,26 +346,34 @@ async function main() {
     const tryPaste = async (text) => {
       const tab = await openTab(cdp, BENCH);
       await sleep(800);
-      await tab.eval(`(() => {
+      const cancelled = await tab.eval(`(() => {
         const t = document.getElementById('prompt-input');
         t.focus();
         const dt = new DataTransfer();
         dt.setData('text/plain', ${JSON.stringify(text)});
-        t.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        return true;
+        return !t.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
       })()`);
       await sleep(500);
       const title = await tab.eval(`(document.getElementById('agentshield-modal-title') || {}).textContent || ''`);
       await tab.close();
+      if (cancelled !== (title === 'Paste blocked')) return 'Paste cancellation and dialog disagree';
       return title;
     };
     await setRule('secret.api_key_like', true);
     await sync();
     check('paste of an API key is stopped at once', await tryPaste('key sk-demo-EXAMPLE123456789'), 'Paste blocked');
+    check('paste of a generic API token is stopped at once', await tryPaste('Api-a1b2c3d4e5f6g7h8i9j0k1'), 'Paste blocked');
+    check('paste of an AQ. token is stopped at once', await tryPaste('AQ.Synthetic_fixture-only_0123456789abcdefghijklm'), 'Paste blocked');
     check('paste of clean text is allowed', await tryPaste('explain TCP vs UDP'), '');
     await setRule('secret.api_key_like', false);
     await sync();
     check('paste with the rule Off is allowed', await tryPaste('key sk-demo-EXAMPLE123456789'), '');
+    await setRule('secret.password_like', true, 'BLOCK');
+    await sync();
+    check('standalone password-like paste is blocked', await tryPaste(SAMPLES['secret.password_like'][0]), 'Paste blocked');
+    check('standalone password-like prompt is blocked', await tryPrompt(SAMPLES['secret.password_like'][0]), 'BLOCK');
+    await setRule('secret.password_like', false, 'WARN');
+    await sync();
 
     // 3. Website categories (lists built into the extension)
     const firstDomain = (id) => JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'rulesets', `${id}.json`), 'utf8'))[0].condition.requestDomains[0];

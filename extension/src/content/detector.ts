@@ -10,7 +10,7 @@
  * (pytest, and `npm test` in extension/).
  */
 
-import { Finding } from '../shared/types';
+import type { Finding } from '../shared/types';
 
 /** Luhn checksum used by payment card numbers. */
 export function luhnValid(digits: string): boolean {
@@ -91,7 +91,7 @@ const PLACEHOLDER = /^(?:\*+|x+|<[^>]*>|\$\{[^}]*\}|\{[^}]*\}|password|pass|pwd|
 
 /** Findings that are never sent or stored in readable form. */
 export const ALWAYS_MASKED_RULES = new Set([
-  'secret.api_key_like', 'pii.credit_card', 'pii.aadhaar',
+  'secret.api_key_like', 'secret.password_like', 'pii.credit_card', 'pii.aadhaar',
   'secret.crypto_key', 'secret.connection_string', 'pii.iban', 'pii.bank_account', 'pii.passport', 'pii.voter_id',
 ]);
 
@@ -102,6 +102,8 @@ const overlaps = (spans: Array<[number, number]>, start: number, end: number) =>
 export class LocalDetector {
   // Common patterns for secrets, credentials, tokens and private keys
   private static API_KEY_PATTERNS = [
+    /(?<![A-Za-z0-9_-])AQ\.[A-Za-z0-9_-]{40,100}(?![A-Za-z0-9_-])/g,
+    /(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])/gi,
     /\bsk-demo-[A-Za-z0-9_-]{10,}\b/gi,
     /\bsk-(?:proj|live|test|ant)-[A-Za-z0-9_-]{20,}\b/g,
     /\bAKIA[0-9A-Z]{12,20}\b/g,
@@ -231,6 +233,9 @@ export class LocalDetector {
     for (const pattern of LocalDetector.API_KEY_PATTERNS) {
       for (const m of LocalDetector.matches(pattern, text)) add('secret.api_key_like', 'SECRET', 'HIGH', m);
     }
+    // A standalone name, symbol and digit sequence is ambiguous, so it has its own policy.
+    const passwordLike = /^[ \t\r\n]*([A-Za-z]{3,32}[@!#$%&*][0-9]{4,16})(?=[ \t\r\n]*(?![\s\S]))/.exec(text);
+    if (passwordLike) addGroup('secret.password_like', 'SECRET', 'MEDIUM', passwordLike);
 
     // 1b. Connection strings with a real password, and crypto wallet private keys
     const connectionSpans: Array<[number, number]> = [];

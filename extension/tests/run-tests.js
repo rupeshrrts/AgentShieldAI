@@ -61,6 +61,10 @@ test('masking hides secrets, cards and Aadhaar', () => {
   assert(!masked.includes('4987 1234 5679'));
 });
 
+test('standalone password masking preserves surrounding whitespace', () => {
+  assert.strictEqual(detector.maskSecretsForAudit('  SampleUser@1234\n'), '  Samp****[MASKED]\n');
+});
+
 test('redaction merges overlapping findings', () => {
   const out = detector.redact('Email demo.user@example.com about PROJECT-ALPHA-CONFIDENTIAL');
   assert(out.includes('[REDACTED:PII]') && out.includes('[REDACTED:RESTRICTED]'));
@@ -506,7 +510,10 @@ test('name rules are plain case-insensitive domain anchors', () => {
 
 // --- Rules must be loaded before anything is enforced (src/shared/policy.ts) ---
 const policyModule = load('src/shared/policy.ts');
-test('catalog has the seventeen detector rules', () => assert.strictEqual(policyModule.CATALOG_RULE_IDS.length, 17));
+test('catalog matches shared detection rules and the file upload rule', () => {
+  const expected = new Set(['file.upload', ...cases.flatMap((c) => c.rules)]);
+  assert.deepStrictEqual([...policyModule.CATALOG_RULE_IDS].sort(), [...expected].sort());
+});
 test('every catalog rule has an employee label and advice', () => {
   for (const id of policyModule.CATALOG_RULE_IDS) {
     assert.ok(policyModule.RULE_LABELS[id], `label ${id}`);
