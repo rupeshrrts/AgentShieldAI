@@ -102,10 +102,15 @@ const overlaps = (spans: Array<[number, number]>, start: number, end: number) =>
 export class LocalDetector {
   // Common patterns for secrets, credentials, tokens and private keys
   private static API_KEY_PATTERNS = [
+    /(?<![A-Za-z0-9_])[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?![A-Za-z0-9_])/gi,
+    /(?<![A-Za-z0-9_])[0-9a-f]{32}(?![A-Za-z0-9_])/gi,
+    /\b[a-z][a-z0-9]{1,30}_(?:live|test)_sk_[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])/gi,
     /(?<![A-Za-z0-9_-])AQ\.[A-Za-z0-9_-]{40,100}(?![A-Za-z0-9_-])/g,
     /(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])/gi,
     /\bsk-demo-[A-Za-z0-9_-]{10,}\b/gi,
-    /\bsk-(?:proj|live|test|ant)-[A-Za-z0-9_-]{20,}\b/g,
+    /\bsk-(?:proj|live|test|ant|svcacct)-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g,
+    /\bsk-[A-Za-z0-9]{32,64}(?![A-Za-z0-9_-])/g,
+    /\b(?:xai-|pplx-|hf_)[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g,
     /\bAKIA[0-9A-Z]{12,20}\b/g,
     /\bgh[pousr]_[A-Za-z0-9_]{36,}\b/g,
     /\bAIza[0-9A-Za-z_-]{35}\b/g,
@@ -113,11 +118,12 @@ export class LocalDetector {
     /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b/g,
     /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
     /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----/g,
-    /\b(?:api[_-]?key|secret[_-]?token|bearer)\s*[:=]\s*['"]?([A-Za-z0-9_\-\.]{16,})['"]?/gi,
     /\b(?:password|passwd|pwd|secret)\s*[:=]\s*['"]?(\S{4,})['"]?/gi,
     /\b(?:my\s+password\s+is|password\s+is|(?:this\s+is\s+my\s+)?password\s*[:=])\s*['"]?(\S{4,})['"]?/gi,
     /\b(\S{4,})\s+(?:(?:this\s+)?is\s+my\s+(?:\w+\s+)?password)\b/gi,
   ];
+
+  private static LABELED_API_CREDENTIAL = /(?<![A-Za-z0-9])(?:(?:api[ _-]?(?:key|token|secret)|secret[ _-]?token|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|bearer)['"]?[ \t\r\n\f\v]*[:=][ \t\r\n\f\v]*['"]?|authorization['"]?[ \t]*[:=][ \t]*['"]?bearer[ \t]+)([A-Za-z0-9._~+\/-]{4,}=*)(?=$|[ \t\r\n\f\v'"&,;)}\]])/gi;
 
   // Standard email format
   private static EMAIL_PATTERN = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
@@ -232,6 +238,9 @@ export class LocalDetector {
     // 1. API keys, tokens, private keys and password definitions
     for (const pattern of LocalDetector.API_KEY_PATTERNS) {
       for (const m of LocalDetector.matches(pattern, text)) add('secret.api_key_like', 'SECRET', 'HIGH', m);
+    }
+    for (const m of LocalDetector.matches(LocalDetector.LABELED_API_CREDENTIAL, text)) {
+      if (!PLACEHOLDER.test(m[1])) addGroup('secret.api_key_like', 'SECRET', 'HIGH', m);
     }
     // A standalone name, symbol and digit sequence is ambiguous, so it has its own policy.
     const passwordLike = /^[ \t\r\n]*([A-Za-z]{3,32}[@!#$%&*][0-9]{4,16})(?=[ \t\r\n]*(?![\s\S]))/.exec(text);

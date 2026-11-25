@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AgentShield - AI Browser Security",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "Stops secrets and personal data leaking into AI tools, and blocks dangerous, adult and piracy websites.",
   "permissions": [
     "storage",

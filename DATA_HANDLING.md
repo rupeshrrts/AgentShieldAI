@@ -92,6 +92,7 @@ No plaintext invite token (customer or staff), confirmation-link token, password
 ## 5. Is sensitive content transmitted outside the browser?
 
 Detected `Api-…` and `AQ.…` tokens and standalone password-like values receive credential masking in audit text. This masking applies independently of the rule's enforcement action.
+The same masking applies to detected bearer tokens, labeled API credentials, UUID-shaped values and 32-character hexadecimal values. IDs with these shapes can be masked even when they are used as ordinary identifiers.
 
 | Event | Text sent | Default |
 | :--- | :--- | :--- |

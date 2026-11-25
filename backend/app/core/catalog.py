@@ -23,7 +23,7 @@ RULE_CATALOG: List[dict] = [
         "rule_id": "secret.api_key_like",
         "category": "SECRET",
         "name": "API keys, tokens, passwords & private keys",
-        "description": "Recognized provider keys, long Api- and AQ. tokens, JWTs, PEM private keys, and labeled credentials.",
+        "description": "Recognized provider keys, UUIDs, 32-character hexadecimal values, bearer headers, labeled credentials, passwords, JWTs, and PEM private keys.",
         "default_action": "BLOCK",
         "default_severity": "HIGH",
     },

@@ -130,10 +130,15 @@ class DetectorEngine:
 
     # Pre-compiled regular expressions for high-throughput matching
     API_KEY_PATTERNS: List[re.Pattern] = [
+        re.compile(r"(?<![A-Za-z0-9_])[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?![A-Za-z0-9_])", re.IGNORECASE | re.ASCII),
+        re.compile(r"(?<![A-Za-z0-9_])[0-9a-f]{32}(?![A-Za-z0-9_])", re.IGNORECASE | re.ASCII),
+        re.compile(r"\b[a-z][a-z0-9]{1,30}_(?:live|test)_sk_[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])", re.IGNORECASE | re.ASCII),
         re.compile(r"(?<![A-Za-z0-9_-])AQ\.[A-Za-z0-9_-]{40,100}(?![A-Za-z0-9_-])"),
         re.compile(r"(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])", re.IGNORECASE | re.ASCII),
         re.compile(r"\bsk-demo-[A-Za-z0-9_-]{10,}\b", re.IGNORECASE),
-        re.compile(r"\bsk-(?:proj|live|test|ant)-[A-Za-z0-9_-]{20,}\b"),
+        re.compile(r"\bsk-(?:proj|live|test|ant|svcacct)-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"),
+        re.compile(r"\bsk-[A-Za-z0-9]{32,64}(?![A-Za-z0-9_-])"),
+        re.compile(r"\b(?:xai-|pplx-|hf_)[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"),
         re.compile(r"\bAKIA[0-9A-Z]{12,20}\b"),  # AWS Access Key ID
         re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{36,}\b"),  # GitHub Personal Access Tokens
         re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),  # Google API key
@@ -141,11 +146,17 @@ class DetectorEngine:
         re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b"),  # Stripe live key
         re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),  # JWT
         re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----"),
-        re.compile(r"\b(?:api[_-]?key|secret[_-]?token|bearer)\s*[:=]\s*['\"]?([A-Za-z0-9_\-\.]{16,})['\"]?", re.IGNORECASE),
         re.compile(r"\b(?:password|passwd|pwd|secret)\s*[:=]\s*['\"]?(\S{4,})['\"]?", re.IGNORECASE),
         re.compile(r"\b(?:my\s+password\s+is|password\s+is|(?:this\s+is\s+my\s+)?password\s*[:=])\s*['\"]?(\S{4,})['\"]?", re.IGNORECASE),
         re.compile(r"\b(\S{4,})\s+(?:(?:this\s+)?is\s+my\s+(?:\w+\s+)?password)\b", re.IGNORECASE),
     ]
+
+    LABELED_API_CREDENTIAL = re.compile(
+        r"(?<![A-Za-z0-9])(?:(?:api[ _-]?(?:key|token|secret)|secret[ _-]?token|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|bearer)['\"]?\s*[:=]\s*['\"]?"
+        r"|authorization['\"]?[ \t]*[:=][ \t]*['\"]?bearer[ \t]+)"
+        r"([A-Za-z0-9._~+/-]{4,}=*)(?=$|[\s'\"&,;)}\]])",
+        re.IGNORECASE | re.ASCII,
+    )
 
     # Standard email address matching
     EMAIL_PATTERN: re.Pattern = re.compile(
@@ -247,6 +258,9 @@ class DetectorEngine:
         for pattern in self.API_KEY_PATTERNS:
             for match in pattern.finditer(text):
                 findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
+        for match in self.LABELED_API_CREDENTIAL.finditer(text):
+            if not _PLACEHOLDER.fullmatch(match.group(1)):
+                add_group("secret.api_key_like", "SECRET", "HIGH", match)
 
         # A standalone name, symbol and digit sequence is ambiguous, so it has its own policy.
         password_like = re.match(r"[ \t\r\n]*([A-Za-z]{3,32}[@!#$%&*][0-9]{4,16})(?=[ \t\r\n]*\Z)", text)

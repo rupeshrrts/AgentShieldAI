@@ -248,18 +248,25 @@ async function main() {
       const tab = await openTab(cdp, BENCH);
       await sleep(800); // content script asks the worker for the rules
       const before = await tab.eval(`document.querySelectorAll('#chat-messages .msg-user').length`);
-      await tab.eval(`(() => {
-        const t = document.getElementById('prompt-input');
-        t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true }));
-        document.getElementById('send-btn').click();
-        return true;
-      })()`);
-      await sleep(700);
-      const out = await tab.eval(`({ sent: document.querySelectorAll('#chat-messages .msg-user').length,
-        modal: (document.querySelector('.agentshield-modal-box') || { className: '' }).className,
-        subtitle: document.querySelector('.agentshield-modal-subtitle')?.textContent })`);
+      const readyDeadline = Date.now() + 8000;
+      let out;
+      let waitingForWorker;
+      do {
+        await tab.eval(`(() => {
+          document.getElementById('agentshield-block-dismiss')?.click();
+          const t = document.getElementById('prompt-input');
+          t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true }));
+          document.getElementById('send-btn').click();
+          return true;
+        })()`);
+        await sleep(700);
+        out = await tab.eval(`({ sent: document.querySelectorAll('#chat-messages .msg-user').length,
+          modal: (document.querySelector('.agentshield-modal-box') || { className: '' }).className,
+          subtitle: document.querySelector('.agentshield-modal-subtitle')?.textContent })`);
+        waitingForWorker = out.subtitle === 'Activation required' || out.subtitle === 'Protection rules loading';
+      } while (waitingForWorker && Date.now() < readyDeadline);
       await tab.close();
-      if (out.subtitle === 'Activation required' || out.subtitle === 'Protection rules loading') return out.subtitle;
+      if (waitingForWorker) return out.subtitle;
       if (out.modal.includes('modal-block')) return 'BLOCK';
       if (out.modal.includes('modal-warn')) return 'WARN';
       if (out.modal.includes('modal-redact')) return 'REDACT';
@@ -364,10 +371,29 @@ async function main() {
     check('paste of an API key is stopped at once', await tryPaste('key sk-demo-EXAMPLE123456789'), 'Paste blocked');
     check('paste of a generic API token is stopped at once', await tryPaste('Api-a1b2c3d4e5f6g7h8i9j0k1'), 'Paste blocked');
     check('paste of an AQ. token is stopped at once', await tryPaste('AQ.Synthetic_fixture-only_0123456789abcdefghijklm'), 'Paste blocked');
+    const bearerHeader = 'Authorization: Bearer sample.token~42';
+    const credentialSamples = {
+      UUID: 'deadbeef-abcd-4abc-abcd-abcdefabcdef',
+      '32-character hex': 'abcdefabcdefabcdefabcdefabcdefab',
+      'provider-prefixed secret': 'sample_live_sk_DEMO_only_abcdef_42',
+      Gemini: 'AQ.Synthetic_fixture-only_0123456789abcdefghijklm',
+      Claude: 'sk-ant-api03-Synthetic_fixture_0123456789-',
+      OpenAI: 'sk-svcacct-Synthetic_fixture_0123456789_',
+    };
+    check('paste of a bearer header is blocked', await tryPaste(bearerHeader), 'Paste blocked');
+    check('submission of a bearer header is blocked', await tryPrompt(bearerHeader), 'BLOCK');
+    for (const [name, sample] of Object.entries(credentialSamples)) {
+      check(`${name} credential paste is blocked`, await tryPaste(sample), 'Paste blocked');
+    }
     check('paste of clean text is allowed', await tryPaste('explain TCP vs UDP'), '');
     await setRule('secret.api_key_like', false);
     await sync();
     check('paste with the rule Off is allowed', await tryPaste('key sk-demo-EXAMPLE123456789'), '');
+    check('paste of a bearer header with the rule Off is allowed', await tryPaste(bearerHeader), '');
+    check('submission of a bearer header with the rule Off is allowed', await tryPrompt(bearerHeader), 'SENT');
+    for (const [name, sample] of Object.entries(credentialSamples)) {
+      check(`${name} credential paste with the rule Off is allowed`, await tryPaste(sample), '');
+    }
     await setRule('secret.password_like', true, 'BLOCK');
     await sync();
     check('standalone password-like paste is blocked', await tryPaste(SAMPLES['secret.password_like'][0]), 'Paste blocked');

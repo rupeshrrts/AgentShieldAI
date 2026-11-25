@@ -1,6 +1,6 @@
 # Publishing AgentShield to the Chrome Web Store and Microsoft Edge Add-ons
 
-Extension 1.10.0 requires a backend with the standalone password-like rule. This guide follows the order of the
+Extension 1.10.1 requires a backend with the standalone password-like rule. This guide follows the order of the
 store submission forms. When extension behaviour changes, update this guide alongside
 [SECURITY_ARCHITECTURE.md](./SECURITY_ARCHITECTURE.md) and [DATA_HANDLING.md](./DATA_HANDLING.md).
 
@@ -11,7 +11,7 @@ cd extension; npm install; npm test
 node ..\scripts\packaging\store-packages.js --api-url https://YOUR-API --dashboard-url https://YOUR-PORTAL
 ```
 
-Output in `dist-store/`: `agentshield-chrome-1.10.0.zip`, `agentshield-edge-1.10.0.zip` (the same Manifest V3 package)
+Output in `dist-store/`: `agentshield-chrome-1.10.1.zip`, `agentshield-edge-1.10.1.zip` (the same Manifest V3 package)
 and `store-release.json` (sizes and SHA-256). The script refuses to write a package unless:
 
 * Manifest V3, valid version, name ≤ 75 and description ≤ 132 characters, no `key`, no `optional_permissions`, no `externally_connectable`;
