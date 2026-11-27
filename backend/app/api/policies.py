@@ -8,6 +8,7 @@ Policies can only reference rule IDs from the detection catalog
 (app/core/catalog.py), because no other rule IDs are ever produced by the detectors.
 """
 
+import json
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -82,6 +83,9 @@ def list_policies(
         settings=ExtensionSettings(
             store_clean_prompt_text=bool(org_settings.store_clean_prompt_text),
             store_violation_prompt_text=bool(org_settings.store_violation_prompt_text),
+            block_passwords_and_secrets=org_settings.block_passwords_and_secrets,
+            credential_prefixes=json.loads(org_settings.credential_prefixes or "[]"),
+            secret_protected_hosts=json.loads(org_settings.secret_protected_hosts or "[]"),
             block_unapproved_ai=bool(org_settings.block_unapproved_ai),
             web_categories=web_categories,
             safe_search=safe_search,
@@ -298,12 +302,14 @@ def evaluate_prompt(
         custom_keywords=get_org_keywords(db, current_user.organization_id),
         include_defaults=False,
     )
-    findings = detector.detect(payload.text)
+    settings = get_org_settings(db, current_user.organization_id)
+    findings = detector.detect(payload.text, json.loads(settings.credential_prefixes or "[]"))
     eval_result = PolicyEvaluator.evaluate(
         findings=findings,
         policies=rule_objs,
         site=payload.site,
         original_text=payload.text,
+        secret_blocking=settings.block_passwords_and_secrets,
     )
 
     return EvaluatePromptResponse(

@@ -7,8 +7,11 @@ import { CheckCircle2, Lock, XCircle } from 'lucide-react';
  */
 
 const covered: Array<[string, string]> = [
-  ['Prompts on supported AI sites', 'ChatGPT, Claude, Gemini, Copilot, Perplexity, DeepSeek, Mistral, Poe, Meta AI and Grok: Enter, Ctrl/Cmd+Enter, the send button and form submits are checked before sending.'],
+  ['Prompts on supported AI sites', 'ChatGPT, Claude, Gemini, Perplexity and the other known AI destinations use browser composer and send-event checks. Generic adapters depend on the site exposing a recognizable composer and Send control.'],
   ['File uploads on those sites', 'File picker, drag-and-drop and pasted files. Text files (code, CSV, JSON, logs, .env...) up to 2 MB are scanned with the same rules.'],
+  ['Gmail compose', 'Partial coverage for managed mail.google.com compose dialogs with recognized Send controls. Inline replies, other layouts and attachments may be outside the hook.'],
+  ['Cursor desktop', 'Partial coverage after separate deployment of AgentShield’s local hook for supported chat, attachment and file-read events. Cursor uses a managed policy file.'],
+  ['Managed website forms', 'Partial coverage for named destinations. The secret switch covers standard text controls and native form submission. Forms with password fields are excluded so people can sign in.'],
   ['Website blocking', 'Blocked sites, and optionally every unapproved AI tool, are stopped at the network level in the browser before the page loads.'],
   ['Detection', 'API keys, tokens, passwords, private keys, emails, phone numbers, card numbers (Luhn), Aadhaar (Verhoeff), PAN, and your confidential keywords.'],
   ['Employee controls', 'Warn, restrict (warnings become blocks) or suspend (all prompts blocked) individual employees.'],
@@ -16,6 +19,8 @@ const covered: Array<[string, string]> = [
 ];
 
 const notCovered: Array<[string, string]> = [
+  ['Webmail and other scripted destinations', 'Outlook and other unsupported custom Send controls require a dedicated integration. Direct browser requests, background synchronization and uploads outside AI sites are outside browser form coverage.'],
+  ['VS Code AI', 'An extension-specific pre-send hook or a managed gateway is required.'],
   ['Other browsers and apps', 'Firefox, Safari, desktop AI apps (ChatGPT/Claude desktop), mobile apps, and scripts or API calls are not covered. Use network/DNS filtering or allow only managed Chrome/Edge.'],
   ['Disabling the extension', 'Employees can remove an extension they installed themselves (AI sites are then unprotected, and the browser stops reporting). Only a force-install through Group Policy, Intune or Google Admin prevents this.'],
   ['Editing the extension locally', 'A user with developer mode can modify a self-installed extension\'s code and skip the activation screen. The server still refuses to sync rules or accept reports from a browser without a valid device session, so it never appears as protected. Force-install the extension to prevent this.'],
@@ -28,8 +33,8 @@ const notCovered: Array<[string, string]> = [
 
 const guarantees: Array<[string, string]> = [
   ['Local inspection', 'Prompt text and file contents are checked inside the employee\'s browser. Nothing is sent to AgentShield to decide.'],
-  ['Masked before leaving the browser', 'Passwords, keys, card and Aadhaar numbers are masked in every event; the server masks them again before storing.'],
-  ['Privacy by default', 'Text of allowed prompts is not stored unless you turn it on. Events are deleted after the retention period.'],
+  ['Decision metadata', 'The browser sends the rule, destination and decision without draft text, clipboard data, filenames or file contents.'],
+  ['Retention', 'Events are deleted after the configured retention period.'],
   ['Per-user activation', 'Every browser is activated by a signed-in account with a single-use code and bound to a key that never leaves it. Copying the extension, its files or its storage grants nothing, and AI sites stay blocked until activation.'],
   ['Least-privilege devices', 'An activated browser holds only a 15-minute session that can read rules and submit events, never sign in to the dashboard or change settings. Revoking it takes effect at its next request.'],
   ['Accountability', 'Every admin change and sign-in attempt is recorded in the Admin Audit Log with before/after values.'],
@@ -75,7 +80,7 @@ export const Limitations: React.FC = () => (
       <List items={guarantees} icon={<CheckCircle2 size={16} color="var(--color-primary)" />} />
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
         Extension permissions: it can read pages on all websites, which is required to block websites and inspect AI sites. Prompt
-        checks run only on the supported AI sites listed above. Full details are in DATA_HANDLING.md and SECURITY_ARCHITECTURE.md.
+        checks run on supported AI sites and standard forms on managed destinations. Full details are in DATA_HANDLING.md and SECURITY_ARCHITECTURE.md.
       </p>
     </div>
   </div>

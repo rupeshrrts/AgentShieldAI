@@ -21,11 +21,11 @@ import {
   PolicyRule,
   SecurityEventPayload,
 } from '../shared/types';
-import { ACTION_PRIORITY, actionForRule, evaluateFindings, policiesComplete, RULE_LABELS } from '../shared/policy';
+import { ACTION_PRIORITY, SECRET_BLOCK_MESSAGE, actionForRule, evaluateFindings, policiesComplete, scopeMatches } from '../shared/policy';
 
 const APPROVAL_TTL_MS = 5000;
 const MAX_SCAN_BYTES = 2 * 1024 * 1024;
-const TEXT_FILE_EXTENSIONS = /\.(txt|csv|tsv|md|json|xml|log|ya?ml|ini|conf|cfg|env|sql|py|js|ts|tsx|jsx|java|cs|go|rb|php|c|cpp|h|sh|ps1|pem|key|properties|html?)$/i;
+const TEXT_FILE_EXTENSIONS = /\.(txt|csv|tsv|md|json|xml|log|ya?ml|ini|conf|cfg|env(?:\.[\w.-]+)?|sql|py|js|ts|tsx|jsx|java|cs|go|rb|php|c|cpp|h|sh|ps1|pem|key|properties|html?)$/i;
 
 type SubmitMethod = 'keyboard' | 'button' | 'form';
 
@@ -52,10 +52,20 @@ function extensionAlive(): boolean {
   }
 }
 
+function insertedText(data: DataTransfer | null): string {
+  if (!data) return '';
+  const plain = data.getData('text/plain');
+  if (plain) return plain;
+  const template = document.createElement('template');
+  template.innerHTML = data.getData('text/html');
+  return template.content.textContent || '';
+}
+
 class ContentController {
   private adapter: ChatGPTAdapter;
   private detector: LocalDetector;
-  private overlay!: AgentShieldOverlay; // created only on supported AI sites
+  private overlay: AgentShieldOverlay;
+  private readonly aiSite: boolean;
   private activePolicies: PolicyRule[] = [];
   // True only when the synced rules hold every catalog rule. Until then nothing is sent (fail closed).
   private policiesReady = false;
@@ -72,20 +82,26 @@ class ContentController {
   private approved: { text: string; until: number } | null = null;
   private approvedFiles = new WeakSet<File>();
   private pendingFileChecks = new WeakSet<EventTarget>();
+  private policyGeneration = 0;
 
   constructor() {
     this.adapter = new ChatGPTAdapter();
     this.detector = new LocalDetector();
-    if (!this.adapter.isSupportedSite()) {
-      return; // Not an AI site: no badge, no listeners
+    this.aiSite = this.adapter.isSupportedSite();
+    this.overlay = new AgentShieldOverlay(this.aiSite);
+    if (!this.aiSite) {
+      this.attachManagedFormInterception();
+      this.listenForPolicyUpdates();
+      void this.loadPolicies();
+      return;
     }
-    this.overlay = new AgentShieldOverlay();
     // Attach listeners synchronously, at document_start, on window in the capture phase:
     // listeners on the same target and phase run in registration order, so these run
     // before any handler the AI site registers later. Nothing is sent until the service
     // worker confirms this browser is activated and the organization's rules have loaded.
     this.attachSubmitInterception();
     this.attachFileInterception();
+    this.listenForPolicyUpdates();
     this.init();
   }
 
@@ -104,17 +120,6 @@ class ContentController {
     await this.loadPolicies();
     this.syncUserStatus();
 
-    try {
-      chrome.runtime.onMessage.addListener((msg, sender) => {
-        if (sender.id !== chrome.runtime.id) return;
-        if (msg.type === 'POLICIES_UPDATED') {
-          this.applySync(msg);
-        }
-      });
-    } catch (e) {
-      // Extension was reloaded before this page finished loading
-    }
-
     const timer = setInterval(() => {
       // After the extension is reloaded or updated, scripts left in open tabs lose access to
       // the extension APIs. Stop quietly; the refreshed tab gets the new version.
@@ -129,6 +134,16 @@ class ContentController {
   }
 
   // ---------------------------------------------------------------- policy state
+
+  private listenForPolicyUpdates() {
+    try {
+      chrome.runtime.onMessage.addListener((msg, sender) => {
+        if (sender.id === chrome.runtime.id && msg.type === 'POLICIES_UPDATED') this.applySync(msg);
+      });
+    } catch {
+      // The extension may have been reloaded.
+    }
+  }
 
   /** Asks the service worker (which holds the device session) for activation and governance status. */
   private syncUserStatus() {
@@ -150,6 +165,7 @@ class ContentController {
   }
 
   private applySync(data: { authorized?: boolean; checks_paused?: boolean; policies?: PolicyRule[]; keywords?: string[]; settings?: ExtensionSettings }) {
+    this.policyGeneration++;
     if (typeof data.authorized === 'boolean') {
       this.authorized = data.authorized;
       this.checksPaused = data.authorized && data.checks_paused === true;
@@ -181,13 +197,15 @@ class ContentController {
   }
 
   private checkUiAvailability() {
-    if (!document.body) return;
+    if (!this.aiSite || !document.body) return;
     const promptEl = this.adapter.findPromptElement();
     this.overlay.updateProtectionStatus(Boolean(promptEl), promptEl ? undefined : 'Prompt box not found on this page.', this.checksPaused);
   }
 
   private evaluateText(text: string): PolicyEvaluationResult {
-    const result = evaluateFindings(this.detector.detect(text), this.activePolicies, this.host(), this.userStatus);
+    const findings = this.detector.detect(text, this.settings.credential_prefixes);
+    const result = evaluateFindings(findings, this.activePolicies, this.host(), this.userStatus,
+      this.settings.block_passwords_and_secrets);
     if (result.action === 'REDACT') {
       result.redacted_text = this.detector.redact(text, result.findings);
     }
@@ -244,15 +262,14 @@ class ContentController {
       void this.showRulesLoading('Prompt not sent');
       return true;
     }
-    if (this.isApproved(promptText)) return false;
-
     const evaluation = this.evaluateText(promptText);
+    if (evaluation.action !== 'BLOCK' && this.isApproved(promptText)) return false;
     if (evaluation.action === 'ALLOW') {
-      this.logCleanPrompt(promptText);
+      this.logCleanPrompt();
       return false;
     }
     if (evaluation.action === 'MONITOR') {
-      this.reportPromptEvent(evaluation, promptText, 'MONITOR', 'monitored');
+      this.reportPromptEvent(evaluation, 'MONITOR', 'monitored');
       return false;
     }
     void this.handlePolicyAction(evaluation, promptText, method);
@@ -319,14 +336,14 @@ class ContentController {
       (e: MouseEvent) => {
         const target = asElement(e.target);
         if (!target || target.closest('.agentshield-modal-backdrop')) return;
-        const targetBtn = target.closest('button') as HTMLElement | null;
+        const targetBtn = target.closest<HTMLElement>('button, [role="button"]');
         const submitBtn = this.adapter.findSubmitButton();
         const isSubmitClick =
           (submitBtn && (submitBtn === target || submitBtn.contains(target))) ||
           (targetBtn && this.adapter.isSubmitButton(targetBtn));
         if (!isSubmitClick) return;
 
-        if (this.gateSubmission(e, this.adapter.getPromptText(), 'button')) this.stop(e);
+        if (this.gateSubmission(e, this.adapter.getPromptText(targetBtn ?? undefined), 'button')) this.stop(e);
       },
       true
     );
@@ -346,8 +363,16 @@ class ContentController {
 
   private async handlePolicyAction(result: PolicyEvaluationResult, originalText: string, method: SubmitMethod) {
     if (result.action === 'BLOCK') {
-      this.reportPromptEvent(result, originalText, 'BLOCK', 'blocked');
-      await this.overlay.showBlockModal(result);
+      this.reportPromptEvent(result, 'BLOCK', 'blocked');
+      const composer = this.adapter.findPromptElement();
+      const secret = result.primary_rule_id?.startsWith('secret.');
+      const redacted = secret && this.detector.redact(originalText, result.findings);
+      const preview = redacted && this.evaluateText(redacted).action === 'ALLOW' ? redacted : undefined;
+      const replace = await this.overlay.showBlockModal(result, undefined, preview);
+      if (replace && preview && composer && composer === this.adapter.findPromptElement()
+          && originalText === this.adapter.getPromptText()) {
+        this.adapter.setPromptText(preview);
+      }
       return;
     }
 
@@ -355,10 +380,8 @@ class ContentController {
       const decision = await this.overlay.showWarnModal(result);
       this.reportPromptEvent(
         result,
-        originalText,
         'WARN',
-        decision.proceed ? 'warned_and_confirmed' : 'warned_and_cancelled',
-        decision.justification
+        decision.proceed ? 'warned_and_confirmed' : 'warned_and_cancelled'
       );
       if (decision.proceed) {
         this.approve(originalText);
@@ -377,14 +400,14 @@ class ContentController {
       await new Promise((r) => setTimeout(r, 50));
       const current = this.adapter.getPromptText();
       if (normalizeText(current) !== normalizeText(redactedText)) {
-        this.reportPromptEvent(result, originalText, 'BLOCK', 'redaction_failed_blocked');
+        this.reportPromptEvent(result, 'BLOCK', 'redaction_failed_blocked');
         await this.overlay.showBlockModal(
           { ...result, action: 'BLOCK', reason: 'AgentShield could not mask the text automatically on this site, so it was not sent.' },
           { title: 'Please remove the sensitive terms', subtitle: 'Edit the prompt yourself, then send it again.' }
         );
         return;
       }
-      this.reportPromptEvent(result, redactedText, 'REDACT', 'redacted_and_submitted');
+      this.reportPromptEvent(result, 'REDACT', 'redacted_and_submitted');
       this.approve(redactedText);
       this.resubmit(method);
     }
@@ -410,6 +433,62 @@ class ContentController {
     }, 150);
   }
 
+  /** Explicitly managed destinations with native forms or a supported webmail composer. */
+  private attachManagedFormInterception() {
+    const enabled = () => extensionAlive() && this.authorized && this.policiesReady && !this.checksPaused
+      && this.settings.block_passwords_and_secrets === true
+      && this.settings.secret_protected_hosts?.some((host) => scopeMatches(host, this.host()));
+    const supportsForm = (form: HTMLFormElement | null): form is HTMLFormElement =>
+      Boolean(form && !Array.from(form.elements).some((field) => field.matches('input[type="password"]')));
+    const isTextField = (field: unknown): field is HTMLTextAreaElement | HTMLInputElement =>
+      field instanceof HTMLTextAreaElement || (field instanceof HTMLInputElement && ['text', 'search'].includes(field.type));
+    const mailEditorSelector = '[contenteditable="true"][role="textbox"][aria-label="Message Body" i]';
+    const gmailEditor = (target: EventTarget | null): HTMLElement | null => this.host() === 'mail.google.com'
+      ? asElement(target)?.closest<HTMLElement>(mailEditorSelector) ?? null
+      : null;
+    const check = (e: Event, text: string, outcome: string) => {
+      const findings = this.detector.detect(text, this.settings.credential_prefixes);
+      const result = evaluateFindings(findings, [], this.host(), 'ACTIVE', true);
+      if (result.action !== 'BLOCK') return false;
+      this.stop(e);
+      this.reportPromptEvent(result, 'BLOCK', outcome);
+      void this.overlay.showBlockModal(result, { subtitle: SECRET_BLOCK_MESSAGE });
+      return true;
+    };
+    window.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (!enabled() || !(form instanceof HTMLFormElement) || !supportsForm(form)) return;
+      for (const field of Array.from(form.elements)) {
+        if (isTextField(field) && field.name && !field.matches(':disabled') && check(e, field.value, 'blocked')) return;
+      }
+    }, true);
+    window.addEventListener('paste', (e) => {
+      const field = e.target;
+      if (enabled() && ((isTextField(field) && supportsForm(field.form)) || gmailEditor(field))) {
+        check(e, insertedText(e.clipboardData), 'paste_blocked');
+      }
+    }, true);
+    window.addEventListener('drop', (e) => {
+      const field = e.target;
+      if (enabled() && ((isTextField(field) && supportsForm(field.form)) || gmailEditor(field))) {
+        check(e, insertedText(e.dataTransfer), 'drop_blocked');
+      }
+    }, true);
+    if (this.host() === 'mail.google.com') {
+      window.addEventListener('click', (e) => {
+        const button = asElement(e.target)?.closest('button, [role="button"]');
+        if (!enabled() || !button?.matches('[aria-label="Send" i], [aria-label^="Send (" i], [data-tooltip^="Send (" i]')) return;
+        const editor = button.closest('[role="dialog"]')?.querySelector<HTMLElement>(mailEditorSelector);
+        if (editor) check(e, editor.innerText, 'blocked');
+      }, true);
+      window.addEventListener('keydown', (e) => {
+        if (!enabled() || e.key !== 'Enter' || e.isComposing || (!e.ctrlKey && !e.metaKey)) return;
+        const editor = gmailEditor(e.target);
+        if (editor) check(e, editor.innerText, 'blocked');
+      }, true);
+    }
+  }
+
   // ---------------------------------------------------------------- file uploads
 
   private attachFileInterception() {
@@ -424,10 +503,16 @@ class ContentController {
       this.pendingFileChecks.add(input);
       void this.checkFiles(files).then((allowed) => {
         this.pendingFileChecks.delete(input);
+        const current = Array.from(input.files || []);
+        if (!input.isConnected || current.length !== files.length || current.some((f, i) => f !== files[i])) {
+          input.value = '';
+          return;
+        }
         if (allowed) {
           files.forEach((f) => this.approvedFiles.add(f));
           input.dispatchEvent(new Event('input', { bubbles: true }));
           input.dispatchEvent(new Event('change', { bubbles: true }));
+          files.forEach((f) => this.approvedFiles.delete(f));
         } else {
           input.value = '';
         }
@@ -441,7 +526,7 @@ class ContentController {
       (e: DragEvent) => {
         const files = Array.from(e.dataTransfer?.files || []);
         if (!files.length) {
-          this.checkInsertedText(e, e.dataTransfer?.getData('text/plain') || '', 'Drop blocked', 'drop_blocked');
+          this.checkInsertedText(e, insertedText(e.dataTransfer), 'Drop blocked', 'drop_blocked');
           return;
         }
         if (files.every((f) => this.approvedFiles.has(f))) return;
@@ -454,6 +539,7 @@ class ContentController {
           const dt = new DataTransfer();
           files.forEach((f) => dt.items.add(f));
           target.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX, clientY }));
+          files.forEach((f) => this.approvedFiles.delete(f));
         });
       },
       true
@@ -464,7 +550,7 @@ class ContentController {
       (e: ClipboardEvent) => {
         const files = Array.from(e.clipboardData?.files || []);
         if (!files.length) {
-          this.checkInsertedText(e, e.clipboardData?.getData('text/plain') || '', 'Paste blocked', 'paste_blocked');
+          this.checkInsertedText(e, insertedText(e.clipboardData), 'Paste blocked', 'paste_blocked');
           return;
         }
         if (files.every((f) => this.approvedFiles.has(f))) return;
@@ -476,6 +562,7 @@ class ContentController {
           const dt = new DataTransfer();
           files.forEach((f) => dt.items.add(f));
           target.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          files.forEach((f) => this.approvedFiles.delete(f));
         });
       },
       true
@@ -494,7 +581,7 @@ class ContentController {
     const result = this.evaluateText(text);
     if (result.action !== 'BLOCK') return;
     this.stop(e);
-    this.reportPromptEvent(result, text, 'BLOCK', outcome);
+    this.reportPromptEvent(result, 'BLOCK', outcome);
     void this.overlay.showBlockModal(result, { title, subtitle: 'Remove the sensitive data before putting it into an AI tool.' });
   }
 
@@ -510,6 +597,7 @@ class ContentController {
    * rules applied to text files. Returns true if the upload may continue.
    */
   private async checkFiles(files: File[]): Promise<boolean> {
+    const generation = this.policyGeneration;
     if (!this.authorized) {
       await this.showActivationRequired('File upload blocked');
       return false;
@@ -524,12 +612,12 @@ class ContentController {
 
     // Scan text-based files with the same rules as prompts
     let contentResult: PolicyEvaluationResult | null = null;
-    const scanned: string[] = [];
+    const scanned = new Set<File>();
     for (const file of files) {
       if (!this.isTextFile(file)) continue;
       try {
         const result = this.evaluateText(await file.text());
-        scanned.push(file.name);
+        scanned.add(file);
         if (!contentResult || ACTION_PRIORITY[result.action] > ACTION_PRIORITY[contentResult.action]) {
           contentResult = result;
         }
@@ -545,14 +633,15 @@ class ContentController {
     if (this.userStatus === 'RESTRICTED' && action === 'WARN') action = 'BLOCK';
 
     const names = files.map((f) => `${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)`).join(', ');
-    const uninspected = files.filter((f) => !scanned.includes(f.name)).map((f) => f.name);
+    const hasUninspected = files.some((f) => !scanned.has(f));
     const useContent = Boolean(contentResult) && ACTION_PRIORITY[contentAction] >= ACTION_PRIORITY[fileAction] && contentAction !== 'ALLOW';
 
     const result: PolicyEvaluationResult = useContent
       ? {
           ...(contentResult as PolicyEvaluationResult),
           action,
-          reason: `${RULE_LABELS[contentResult!.primary_rule_id || ''] || 'Sensitive data'} found inside ${scanned.join(', ')}.`,
+          reason: contentResult!.primary_rule_id?.startsWith('secret.')
+            ? SECRET_BLOCK_MESSAGE : 'Sensitive data was found in an attachment.',
         }
       : {
           action,
@@ -562,12 +651,12 @@ class ContentController {
             action === 'BLOCK'
               ? 'Your organization does not allow uploading files to AI tools.'
               : 'You are uploading a file to an AI tool.' +
-                (uninspected.length ? ' AgentShield cannot read inside PDF, Office or image files, so check them yourself.' : ''),
+                (hasUninspected ? ' One or more files could not be inspected for sensitive data.' : ''),
           findings: [],
           needs_confirmation: action === 'WARN',
         };
 
-    const report = (outcome: string, act: PolicyAction, justification?: string) =>
+    const report = (outcome: string, act: PolicyAction) =>
       this.sendAuditEvent({
         site: host,
         rule_id: result.primary_rule_id || 'file.upload',
@@ -575,10 +664,9 @@ class ContentController {
         severity: result.highest_severity || 'MEDIUM',
         action: act,
         outcome,
-        prompt: this.settings.store_violation_prompt_text ? `File upload: ${names}` : undefined,
-        justification,
       });
 
+    if (generation !== this.policyGeneration || !this.authorized) return false;
     if (action === 'ALLOW') return true;
     if (action === 'MONITOR') {
       report('file_monitored', 'MONITOR');
@@ -590,19 +678,17 @@ class ContentController {
       return false;
     }
     const decision = await this.overlay.showWarnModal(result, { title: 'Check this file before uploading', subtitle: names });
-    report(decision.proceed ? 'file_warned_and_confirmed' : 'file_warned_and_cancelled', 'WARN', decision.justification);
-    return decision.proceed;
+    report(decision.proceed ? 'file_warned_and_confirmed' : 'file_warned_and_cancelled', 'WARN');
+    return decision.proceed && generation === this.policyGeneration && this.authorized;
   }
 
   // ---------------------------------------------------------------- audit events
 
-  /** Sends a prompt event. Only masked text leaves the browser, and only if the organization stores prompt text. */
+  /** Sends only decision metadata. Message, clipboard and file content remain local. */
   private reportPromptEvent(
     result: PolicyEvaluationResult,
-    text: string,
     action: PolicyAction,
-    outcome: string,
-    justification?: string
+    outcome: string
   ) {
     const ruleId = result.primary_rule_id || 'unknown.rule';
     const finding = result.findings.find((f) => f.rule_id === ruleId) || result.findings[0];
@@ -613,13 +699,11 @@ class ContentController {
       severity: result.highest_severity || 'HIGH',
       action,
       outcome,
-      prompt: this.settings.store_violation_prompt_text ? this.detector.maskSecretsForAudit(text) : undefined,
-      justification,
     });
   }
 
-  /** Records an allowed prompt for usage statistics; its text is included only if the organization opted in. */
-  private logCleanPrompt(promptText: string) {
+  /** Records an allowed prompt for usage statistics. */
+  private logCleanPrompt() {
     this.sendAuditEvent({
       site: this.host(),
       rule_id: 'general.clean_prompt',
@@ -627,7 +711,6 @@ class ContentController {
       severity: 'LOW',
       action: 'ALLOW',
       outcome: 'allowed',
-      prompt: this.settings.store_clean_prompt_text ? this.detector.maskSecretsForAudit(promptText) : undefined,
     });
   }
 
@@ -636,7 +719,7 @@ class ContentController {
 
   private sendAuditEvent(payload: SecurityEventPayload) {
     const now = Date.now();
-    const key = `${payload.action}_${payload.rule_id}_${payload.outcome}_${payload.prompt || ''}`;
+    const key = `${payload.action}_${payload.rule_id}_${payload.outcome}`;
     if (this.lastDispatchedKey === key && now - this.lastDispatchedTime < 2000) return;
     this.lastDispatchedKey = key;
     this.lastDispatchedTime = now;
@@ -647,7 +730,7 @@ class ContentController {
         void chrome.runtime.lastError;
       });
     } catch (e) {
-      console.warn('[AgentShield] Could not hand audit event to the service worker:', e);
+      // The service worker may be unavailable after extension reload.
     }
   }
 }

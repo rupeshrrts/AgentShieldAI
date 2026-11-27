@@ -12,27 +12,19 @@ export const InteractiveSandbox: React.FC = () => {
   const presets = [
     {
       label: '1. Secret API Key',
-      action: 'BLOCK',
       prompt: 'Here is my secret test token: sk-demo-EXAMPLE123456789 please inspect my SQL database.',
-      badgeClass: 'badge-block',
     },
     {
       label: '2. Customer PII Email',
-      action: 'WARN',
       prompt: 'Please send our financial review to demo.user@example.com before the meeting.',
-      badgeClass: 'badge-warn',
     },
     {
       label: '3. Restricted Codeword',
-      action: 'REDACT',
       prompt: 'Draft an internal strategy memo regarding PROJECT-ALPHA-CONFIDENTIAL launch schedule.',
-      badgeClass: 'badge-redact',
     },
     {
       label: '4. Benign Code Query',
-      action: 'ALLOW',
       prompt: 'Explain Python list comprehensions and best practices for asynchronous iterators.',
-      badgeClass: 'badge-allow',
     },
   ];
 
@@ -55,7 +47,7 @@ export const InteractiveSandbox: React.FC = () => {
           Interactive Prompt Tester & Sandbox
         </h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          Simulate prompt submission and test real-time deterministic detection and policy resolution rules.
+          Test your current policy using synthetic text. The tester sends the sample to the AgentShield server for evaluation.
         </p>
       </div>
 
@@ -97,9 +89,6 @@ export const InteractiveSandbox: React.FC = () => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>{p.label}</span>
-                <span className={p.badgeClass} style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>
-                  {p.action}
-                </span>
               </div>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {p.prompt}

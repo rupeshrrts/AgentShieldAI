@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import Principal, employee_id_for, get_current_user, get_principal
 from app.api.schemas import EndpointHeartbeat, EndpointOut, EndpointSummary
+from app.core.policy_revision import current_policy_revision
 from app.db.models import Endpoint, Policy, User
 from app.db.session import get_db
 
@@ -62,6 +63,8 @@ def heartbeat(
     row.browser = payload.browser
     row.platform = payload.platform
     row.policy_version = payload.policy_version
+    row.secret_policy_active = payload.secret_policy_active
+    row.applied_policy_revision = payload.applied_policy_revision
     row.enrollment_source = "activation" if principal.device is not None else payload.enrollment_source
     row.last_seen_at = now
     db.commit()
@@ -73,6 +76,7 @@ def list_endpoints(current_user: User = Depends(get_current_user), db: Session =
     """All browsers that have checked in, with online/stale/offline status and policy currency."""
     org_id = current_user.organization_id
     latest = current_policy_version(db, org_id)
+    revision = current_policy_revision(db, org_id)
     now = datetime.now(timezone.utc)
     rows = (
         db.query(Endpoint)
@@ -92,6 +96,8 @@ def list_endpoints(current_user: User = Depends(get_current_user), db: Session =
         if not is_current:
             outdated += 1
         out = EndpointOut.model_validate(r)
+        if r.applied_policy_revision != revision or state != "ONLINE":
+            out.secret_policy_active = None
         out.status = state
         out.policy_current = is_current
         items.append(out)

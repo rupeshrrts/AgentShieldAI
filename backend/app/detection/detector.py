@@ -118,6 +118,7 @@ UPI_HANDLES = [
 ]
 
 # A password part that is only a placeholder (connection-string examples are not secrets)
+_PASSWORD_PLACEHOLDER = re.compile(r"\$\{.+\}|<[^>]+>|\[REDACTED:SECRET\]|\[(?:MASKED|SECRET_MASKED|MASKED_SECRET|MASKED_PASSWORD)\]|\*{4}\[SECRET_MASKED\]")
 _PLACEHOLDER = re.compile(r"^(?:\*+|x+|<[^>]*>|\$\{[^}]*\}|\{[^}]*\}|password|pass|pwd|secret|changeme)$", re.IGNORECASE)
 
 
@@ -130,8 +131,6 @@ class DetectorEngine:
 
     # Pre-compiled regular expressions for high-throughput matching
     API_KEY_PATTERNS: List[re.Pattern] = [
-        re.compile(r"(?<![A-Za-z0-9_])[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?![A-Za-z0-9_])", re.IGNORECASE | re.ASCII),
-        re.compile(r"(?<![A-Za-z0-9_])[0-9a-f]{32}(?![A-Za-z0-9_])", re.IGNORECASE | re.ASCII),
         re.compile(r"\b[a-z][a-z0-9]{1,30}_(?:live|test)_sk_[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])", re.IGNORECASE | re.ASCII),
         re.compile(r"(?<![A-Za-z0-9_-])AQ\.[A-Za-z0-9_-]{40,100}(?![A-Za-z0-9_-])"),
         re.compile(r"(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])", re.IGNORECASE | re.ASCII),
@@ -145,15 +144,22 @@ class DetectorEngine:
         re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),  # Slack token
         re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b"),  # Stripe live key
         re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),  # JWT
-        re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----"),
-        re.compile(r"\b(?:password|passwd|pwd|secret)\s*[:=]\s*['\"]?(\S{4,})['\"]?", re.IGNORECASE),
-        re.compile(r"\b(?:my\s+password\s+is|password\s+is|(?:this\s+is\s+my\s+)?password\s*[:=])\s*['\"]?(\S{4,})['\"]?", re.IGNORECASE),
-        re.compile(r"\b(\S{4,})\s+(?:(?:this\s+)?is\s+my\s+(?:\w+\s+)?password)\b", re.IGNORECASE),
+        re.compile(r"-----BEGIN ((?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?)-----(?:[\s\S]*?-----END \1-----|(?:\r?\n[^\r\n]*)*)"),
+        re.compile(r"""(?<![A-Za-z0-9])(?:password|passwd|pwd|passcode|passphrase|pin|secret)["']?[ \t]*:[ \t]*[|>][-+]?[ \t]*\r?\n([ \t]+)[^\r\n]+(?:\r?\n\1[^\r\n]*)*""", re.IGNORECASE | re.ASCII),
+        re.compile(r"(?<!\S)(?!what\b|who\b|how\b|where\b|when\b|why\b|this\b|that\b)(\S+)[ \t]+(?:this[ \t]+)?is[ \t]+my[ \t]+(?:[A-Za-z]+[ \t]+)?(?:password|passphrase|passcode|pin)\b", re.IGNORECASE | re.ASCII),
     ]
+
+    CONTEXTUAL_PASSWORD = re.compile(
+        r"""(?<![A-Za-z0-9])(?:password|passwd|pwd|passcode|passphrase|pin|secret|contrase[\u00f1\u00d1]a|mot[ \t]+de[ \t]+passe|senha)["']?(?:[ \t]*[:=][ \t]*|[ \t]+is[ \t]+(?![ \t]*(?:required|optional|case-sensitive|stored|hashed|encrypted|reset|invalid|incorrect)(?![A-Za-z0-9_-])))(?:"((?:\\.|[^"\\\r\n])+)"|'((?:\\.|[^'\\\r\n])+)'|(\$\{[^}\r\n]+\}|(?!["'])[^\r\n]+))""",
+        re.IGNORECASE | re.ASCII,
+    )
+
+    CLI_CREDENTIAL = re.compile(r"""(?<![A-Za-z0-9_-])--(?:password|passwd|passphrase|passcode|db-password|client-secret)(?:[ \t]+|=)(?:"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|(?!--[A-Za-z])[^\s"'$<][^\s"'<>]*)(?![A-Za-z0-9_-])""", re.IGNORECASE | re.ASCII)
+    XML_CREDENTIAL = re.compile(r"""<(password|passwd|passphrase|passcode|client-secret)>[ \t]*([^<\r\n]+)(?=</\1>)""", re.IGNORECASE | re.ASCII)
 
     LABELED_API_CREDENTIAL = re.compile(
         r"(?<![A-Za-z0-9])(?:(?:api[ _-]?(?:key|token|secret)|secret[ _-]?token|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|bearer)['\"]?\s*[:=]\s*['\"]?"
-        r"|authorization['\"]?[ \t]*[:=][ \t]*['\"]?bearer[ \t]+)"
+        r"|authorization['\"]?[ \t]*[:=][ \t]*['\"]?(?:bearer|basic)[ \t]+)"
         r"([A-Za-z0-9._~+/-]{4,}=*)(?=$|[\s'\"&,;)}\]])",
         re.IGNORECASE | re.ASCII,
     )
@@ -181,7 +187,7 @@ class DetectorEngine:
     # --- 2.6 data rules. Patterns that need a nearby word put the value in group 1 at the END of the match.
 
     # Connection strings with a password: scheme://user:password@host (group 1 = password)
-    CONNECTION_PATTERN: re.Pattern = re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]{1,20}://[^\s:/@'\"]+:([^\s@/'\"]{3,})@[^\s/'\"]+")
+    CONNECTION_PATTERN: re.Pattern = re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]{1,20}://[^\s:/@'\"]+:([^\s@/'\"]+)@[^\s/'\"]+")
 
     # Crypto wallet private keys: Bitcoin WIF (uncompressed / compressed), BIP32 xprv, 64-hex key next to a key word
     CRYPTO_PATTERNS: List[re.Pattern] = [
@@ -240,7 +246,7 @@ class DetectorEngine:
         if keyword and keyword.strip():
             self.restricted_keywords.add(keyword.strip())
 
-    def detect(self, text: str) -> List[Finding]:
+    def detect(self, text: str, credential_prefixes: Optional[List[str]] = None) -> List[Finding]:
         """Scans input text and returns all detected sensitive data occurrences."""
         if not text:
             return []
@@ -257,6 +263,26 @@ class DetectorEngine:
         # 1. API keys, tokens, private keys and password definitions
         for pattern in self.API_KEY_PATTERNS:
             for match in pattern.finditer(text):
+                findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
+        for match in self.CONTEXTUAL_PASSWORD.finditer(text):
+            quoted = match.group(1) if match.group(1) is not None else match.group(2)
+            value = quoted if quoted is not None else match.group(3).rstrip(" \t")
+            if not value or _PASSWORD_PLACEHOLDER.fullmatch(value):
+                continue
+            end = match.end() - (1 if quoted is not None else len(match.group(3)) - len(value))
+            findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", end - len(value), end, value))
+        for match in self.CLI_CREDENTIAL.finditer(text):
+            findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
+        for match in self.XML_CREDENTIAL.finditer(text):
+            value = match.group(2).strip()
+            if not value or _PASSWORD_PLACEHOLDER.fullmatch(value):
+                continue
+            findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(2), match.end(2), match.group(2)))
+        for prefix in credential_prefixes or []:
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{2,30}[-_]", prefix):
+                continue
+            pattern = r"(?<![A-Za-z0-9_-])" + prefix + r"[A-Za-z0-9_-]{12,}(?![A-Za-z0-9_-])"
+            for match in re.finditer(pattern, text):
                 findings.append(Finding("secret.api_key_like", "SECRET", "HIGH", match.start(), match.end(), match.group(0)))
         for match in self.LABELED_API_CREDENTIAL.finditer(text):
             if not _PLACEHOLDER.fullmatch(match.group(1)):

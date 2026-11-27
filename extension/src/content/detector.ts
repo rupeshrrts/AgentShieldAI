@@ -87,6 +87,7 @@ export const UPI_HANDLES = [
 ];
 
 /** A password part that is only a placeholder (connection-string examples are not secrets). */
+const PASSWORD_PLACEHOLDER = /^(?:\$\{.+\}|<[^>]+>|\[REDACTED:SECRET\]|\[(?:MASKED|SECRET_MASKED|MASKED_SECRET|MASKED_PASSWORD)\]|\*{4}\[SECRET_MASKED\])$/;
 const PLACEHOLDER = /^(?:\*+|x+|<[^>]*>|\$\{[^}]*\}|\{[^}]*\}|password|pass|pwd|secret|changeme)$/i;
 
 /** Findings that are never sent or stored in readable form. */
@@ -102,8 +103,6 @@ const overlaps = (spans: Array<[number, number]>, start: number, end: number) =>
 export class LocalDetector {
   // Common patterns for secrets, credentials, tokens and private keys
   private static API_KEY_PATTERNS = [
-    /(?<![A-Za-z0-9_])[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?![A-Za-z0-9_])/gi,
-    /(?<![A-Za-z0-9_])[0-9a-f]{32}(?![A-Za-z0-9_])/gi,
     /\b[a-z][a-z0-9]{1,30}_(?:live|test)_sk_[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])/gi,
     /(?<![A-Za-z0-9_-])AQ\.[A-Za-z0-9_-]{40,100}(?![A-Za-z0-9_-])/g,
     /(?<![A-Za-z0-9_-])api-(?=[A-Za-z0-9]{0,79}[0-9])(?=[A-Za-z0-9]{0,79}[A-Za-z])[A-Za-z0-9]{20,80}(?![A-Za-z0-9_-])/gi,
@@ -117,13 +116,18 @@ export class LocalDetector {
     /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
     /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b/g,
     /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
-    /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----/g,
-    /\b(?:password|passwd|pwd|secret)\s*[:=]\s*['"]?(\S{4,})['"]?/gi,
-    /\b(?:my\s+password\s+is|password\s+is|(?:this\s+is\s+my\s+)?password\s*[:=])\s*['"]?(\S{4,})['"]?/gi,
-    /\b(\S{4,})\s+(?:(?:this\s+)?is\s+my\s+(?:\w+\s+)?password)\b/gi,
+    /(?<![A-Za-z0-9])(?:password|passwd|pwd|passcode|passphrase|pin|secret)["']?[ \t]*:[ \t]*[|>][-+]?[ \t]*\r?\n([ \t]+)[^\r\n]+(?:\r?\n\1[^\r\n]*)*/gi,
+    /-----BEGIN ((?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?)-----(?:[\s\S]*?-----END \1-----|(?:\r?\n[^\r\n]*)*)/g,
+
+    /(?<!\S)(?!what\b|who\b|how\b|where\b|when\b|why\b|this\b|that\b)(\S+)[ \t]+(?:this[ \t]+)?is[ \t]+my[ \t]+(?:[A-Za-z]+[ \t]+)?(?:password|passphrase|passcode|pin)\b/gi,
   ];
 
-  private static LABELED_API_CREDENTIAL = /(?<![A-Za-z0-9])(?:(?:api[ _-]?(?:key|token|secret)|secret[ _-]?token|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|bearer)['"]?[ \t\r\n\f\v]*[:=][ \t\r\n\f\v]*['"]?|authorization['"]?[ \t]*[:=][ \t]*['"]?bearer[ \t]+)([A-Za-z0-9._~+\/-]{4,}=*)(?=$|[ \t\r\n\f\v'"&,;)}\]])/gi;
+  private static CONTEXTUAL_PASSWORD = /(?<![A-Za-z0-9])(?:password|passwd|pwd|passcode|passphrase|pin|secret|contrase[\u00f1\u00d1]a|mot[ \t]+de[ \t]+passe|senha)["']?(?:[ \t]*[:=][ \t]*|[ \t]+is[ \t]+(?![ \t]*(?:required|optional|case-sensitive|stored|hashed|encrypted|reset|invalid|incorrect)(?![A-Za-z0-9_-])))(?:"((?:\\.|[^"\\\r\n])+)"|'((?:\\.|[^'\\\r\n])+)'|(\$\{[^}\r\n]+\}|(?!["'])[^\r\n]+))/gi;
+
+  private static CLI_CREDENTIAL = /(?<![A-Za-z0-9_-])--(?:password|passwd|passphrase|passcode|db-password|client-secret)(?:[ \t]+|=)(?:"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|(?!--[A-Za-z])[^\s"'$<][^\s"'<>]*)(?![A-Za-z0-9_-])/gi;
+  private static XML_CREDENTIAL = /<(password|passwd|passphrase|passcode|client-secret)>[ \t]*([^<\r\n]+)(?=<\/\1>)/gi;
+
+  private static LABELED_API_CREDENTIAL = /(?<![A-Za-z0-9])(?:(?:api[ _-]?(?:key|token|secret)|secret[ _-]?token|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|bearer)['"]?[ \t\r\n\f\v]*[:=][ \t\r\n\f\v]*['"]?|authorization['"]?[ \t]*[:=][ \t]*['"]?(?:bearer|basic)[ \t]+)([A-Za-z0-9._~+\/-]{4,}=*)(?=$|[ \t\r\n\f\v'"&,;)}\]])/gi;
 
   // Standard email format
   private static EMAIL_PATTERN = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
@@ -146,7 +150,7 @@ export class LocalDetector {
   // --- 2.6 data rules. Patterns that need a nearby word put the value in group 1 at the END of the match.
 
   // Connection strings with a password: scheme://user:password@host (group 1 = password)
-  private static CONNECTION_PATTERN = /\b[A-Za-z][A-Za-z0-9+.-]{1,20}:\/\/[^\s:\/@'"]+:([^\s@\/'"]{3,})@[^\s\/'"]+/g;
+  private static CONNECTION_PATTERN = /\b[A-Za-z][A-Za-z0-9+.-]{1,20}:\/\/[^\s:\/@'"]+:([^\s@\/'"]+)@[^\s\/'"]+/g;
 
   // Crypto wallet private keys: Bitcoin WIF (uncompressed / compressed), BIP32 xprv, 64-hex key next to a key word
   private static CRYPTO_PATTERNS = [
@@ -221,7 +225,7 @@ export class LocalDetector {
   /**
    * Scans a prompt string and returns any detected findings with start/end character offsets.
    */
-  public detect(text: string): Finding[] {
+  public detect(text: string, credentialPrefixes: string[] = []): Finding[] {
     if (!text || typeof text !== 'string') return [];
 
     const findings: Finding[] = [];
@@ -237,6 +241,27 @@ export class LocalDetector {
 
     // 1. API keys, tokens, private keys and password definitions
     for (const pattern of LocalDetector.API_KEY_PATTERNS) {
+      for (const m of LocalDetector.matches(pattern, text)) add('secret.api_key_like', 'SECRET', 'HIGH', m);
+    }
+    for (const m of LocalDetector.matches(LocalDetector.CONTEXTUAL_PASSWORD, text)) {
+      const quoted = m[1] ?? m[2];
+      const value = quoted ?? m[3].replace(/[ \t]+$/, '');
+      if (!value || PASSWORD_PLACEHOLDER.test(value)) continue;
+      const end = m.index + m[0].length - (quoted === undefined ? m[3].length - value.length : 1);
+      findings.push({ rule_id: 'secret.api_key_like', category: 'SECRET', severity: 'HIGH', start: end - value.length, end, matched_value: value });
+    }
+    for (const m of LocalDetector.matches(LocalDetector.CLI_CREDENTIAL, text)) {
+      add('secret.api_key_like', 'SECRET', 'HIGH', m);
+    }
+    for (const m of LocalDetector.matches(LocalDetector.XML_CREDENTIAL, text)) {
+      const value = m[2].trim();
+      if (!value || PASSWORD_PLACEHOLDER.test(value)) continue;
+      const start = m.index + m[0].length - m[2].length;
+      findings.push({ rule_id: 'secret.api_key_like', category: 'SECRET', severity: 'HIGH', start, end: start + m[2].length, matched_value: m[2] });
+    }
+    for (const prefix of credentialPrefixes) {
+      if (!/^[A-Za-z][A-Za-z0-9_-]{2,30}[-_]$/.test(prefix)) continue;
+      const pattern = new RegExp('(?<![A-Za-z0-9_-])' + prefix + '[A-Za-z0-9_-]{12,}(?![A-Za-z0-9_-])', 'g');
       for (const m of LocalDetector.matches(pattern, text)) add('secret.api_key_like', 'SECRET', 'HIGH', m);
     }
     for (const m of LocalDetector.matches(LocalDetector.LABELED_API_CREDENTIAL, text)) {

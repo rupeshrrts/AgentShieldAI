@@ -704,3 +704,10 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS free_started_at TIMESTAMP WIT
 -- ==============================================================================
 
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS policy_revision INTEGER NOT NULL DEFAULT 1;
+
+-- Credential protection and reported browser policy state
+ALTER TABLE organization_settings ADD COLUMN IF NOT EXISTS block_passwords_and_secrets BOOLEAN;
+ALTER TABLE organization_settings ADD COLUMN IF NOT EXISTS credential_prefixes TEXT;
+ALTER TABLE organization_settings ADD COLUMN IF NOT EXISTS secret_protected_hosts TEXT;
+ALTER TABLE endpoints ADD COLUMN IF NOT EXISTS secret_policy_active BOOLEAN;
+ALTER TABLE endpoints ADD COLUMN IF NOT EXISTS applied_policy_revision INTEGER;

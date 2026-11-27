@@ -10,6 +10,7 @@ Everything an administrator manages from the dashboard's Deployment & Settings p
 """
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -85,6 +86,9 @@ def _settings_out(db: Session, organization_id: str) -> OrgSettingsOut:
         retention_days=org.retention_days if org else 30,
         store_clean_prompt_text=bool(row.store_clean_prompt_text),
         store_violation_prompt_text=bool(row.store_violation_prompt_text),
+        block_passwords_and_secrets=row.block_passwords_and_secrets,
+        credential_prefixes=json.loads(row.credential_prefixes or "[]"),
+        secret_protected_hosts=json.loads(row.secret_protected_hosts or "[]"),
         block_unapproved_ai=bool(row.block_unapproved_ai),
         require_device_approval=bool(row.require_device_approval),
         web_categories=categories,
@@ -269,9 +273,21 @@ def update_settings(
         include={
             "retention_days", "store_clean_prompt_text", "store_violation_prompt_text",
             "block_unapproved_ai", "require_device_approval", "web_categories", "safe_search",
+            "block_passwords_and_secrets", "credential_prefixes", "secret_protected_hosts",
         }
     )
     row = get_org_settings(db, admin.organization_id)
+    if payload.credential_prefixes is not None:
+        if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{2,30}[-_]", prefix) for prefix in payload.credential_prefixes):
+            raise HTTPException(422, "Use public credential prefixes such as corp_key_, without secret values.")
+        row.credential_prefixes = json.dumps(sorted(set(payload.credential_prefixes)))
+    if payload.secret_protected_hosts is not None:
+        hosts = {host.strip().lower() for host in payload.secret_protected_hosts}
+        if any(len(host) > 253 or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}", host) for host in hosts):
+            raise HTTPException(422, "Enter destination hostnames without URLs or wildcards.")
+        row.secret_protected_hosts = json.dumps(sorted(hosts))
+    if payload.block_passwords_and_secrets is not None:
+        row.block_passwords_and_secrets = payload.block_passwords_and_secrets
     if payload.web_categories is not None:
         unknown = sorted(set(payload.web_categories) - set(WEB_CATEGORY_IDS))
         if unknown:

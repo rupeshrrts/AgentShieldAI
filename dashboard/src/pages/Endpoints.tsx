@@ -134,6 +134,7 @@ export const Endpoints: React.FC<EndpointsProps> = ({ endpoints, onRefresh, onNa
                     <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{e.extension_version ? `v${e.extension_version}` : '—'}</td>
                     <td style={{ padding: '10px 16px', color: e.policy_current ? 'var(--color-success-text)' : 'var(--color-danger-text)', fontWeight: 600 }}>
                       v{e.policy_version ?? '?'} {e.policy_current ? '' : '(outdated)'}
+                      <div>Secret blocking {e.secret_policy_active == null ? 'unconfirmed' : e.secret_policy_active ? 'active' : 'inactive'}</div>
                     </td>
                     <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{SOURCE_LABELS[e.enrollment_source || 'none'] || e.enrollment_source}</td>
                     <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{e.first_seen_at ? new Date(e.first_seen_at).toLocaleDateString() : '—'}</td>

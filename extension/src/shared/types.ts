@@ -56,6 +56,9 @@ export interface SecurityEventPayload {
 
 /** Settings managed from the dashboard and synced to the extension. */
 export interface ExtensionSettings {
+  block_passwords_and_secrets?: boolean | null;
+  credential_prefixes?: string[];
+  secret_protected_hosts?: string[];
   store_clean_prompt_text: boolean;
   store_violation_prompt_text: boolean;
   block_unapproved_ai: boolean;

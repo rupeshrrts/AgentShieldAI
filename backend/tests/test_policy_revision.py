@@ -82,6 +82,45 @@ def test_a_read_without_changes_keeps_the_revision(client):
     assert client.get("/api/v1/policies", headers=device).json()["policy_revision"] == first
 
 
+def test_secret_setting_sync_and_browser_acknowledgement(client):
+    _, admin, device = _account(client)
+    _, _, other_device = _account(client)
+    url = "/api/v1/org/settings"
+    initial = client.get("/api/v1/policies", headers=device).json()
+    assert initial["settings"]["block_passwords_and_secrets"] is None
+    params = {
+        "block_passwords_and_secrets": True,
+        "credential_prefixes": ["fixture_key_"],
+        "secret_protected_hosts": ["forms.example.test"],
+    }
+    assert client.patch(url, headers=device, json=params).status_code in (401, 403)
+    assert client.patch(url, headers=admin, json={"credential_prefixes": ["(.*)+"]}).status_code == 422
+    response = client.patch(url, headers=admin, json=params)
+    assert response.status_code == 200
+    sync = client.get("/api/v1/policies", headers=device).json()
+    assert sync["policy_revision"] > initial["policy_revision"]
+    assert all(sync["settings"][key] == value for key, value in params.items())
+    assert sync["policies"] == initial["policies"]
+    assert client.get("/api/v1/policies", headers=other_device).json()["settings"]["block_passwords_and_secrets"] is None
+    audit = client.get("/api/v1/org/audit-log?action=settings.update", headers=admin).json()["items"]
+    assert audit
+
+    heartbeat = {
+        "device_id": "ignored-device-id",
+        "policy_version": sync["policy_version"],
+        "applied_policy_revision": sync["policy_revision"],
+        "secret_policy_active": True,
+    }
+    assert client.post("/api/v1/endpoints/heartbeat", headers=device, json=heartbeat).status_code == 204
+    endpoint = lambda: client.get("/api/v1/endpoints", headers=admin).json()["items"][0]
+    assert endpoint()["secret_policy_active"] is True
+    assert client.patch(url, headers=admin, json={"block_passwords_and_secrets": False}).status_code == 200
+    assert endpoint()["secret_policy_active"] is None
+    heartbeat.update(applied_policy_revision=_revision(client, device), secret_policy_active=False)
+    assert client.post("/api/v1/endpoints/heartbeat", headers=device, json=heartbeat).status_code == 204
+    assert endpoint()["secret_policy_active"] is False
+
+
 def test_changes_do_not_leak_between_accounts(client):
     _, admin_a, _ = _account(client)
     _, _, device_b = _account(client)

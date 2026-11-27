@@ -443,12 +443,86 @@ powershell -ExecutionPolicy Bypass -File scripts\system-installer\Install-AgentS
 `chrome://extensions` (or `edge://extensions`) → **Developer mode** on → **Load unpacked** → that folder → pin the
 icon. Repeat per browser. The Download page shows the zip's SHA-256 (check with `certutil -hashfile <file> SHA256`).
 
-**C. Store listing:** build with `node scripts\packaging\store-packages.js --api-url https://YOUR-BACKEND
---dashboard-url https://YOUR-PORTAL` and follow [STORE_SUBMISSION.md](./STORE_SUBMISSION.md). After approval set
-the two store IDs on the backend.
+**C. Store listing:** see [Publishing to browser stores](#publishing-to-browser-stores).
 
 To cover "the whole PC", also block other browsers (AppLocker / Intune app control) and, optionally, AI sites at
 your firewall or DNS filter.
+
+## Publishing to browser stores
+
+From the repository root, build the same Manifest V3 package for Chrome and Edge.
+
+```powershell
+node scripts\packaging\store-packages.js --api-url https://YOUR-BACKEND --dashboard-url https://YOUR-PORTAL
+```
+
+The output in `dist-store/` contains both store ZIPs and SHA-256 checksums in `store-release.json`.
+The packager validates the manifest, references, permissions, icon, HTTPS defaults and absence of keys,
+executables, source maps, test files and remote code. Builds made with `--allow-localhost` are for local testing.
+
+### Listing and reviewer access
+
+Use **AgentShield - AI Browser Security**, the Productivity category, English, the 128 px extension icon
+and your portal/support address. Capture the connected popup, blocked prompt, Protection rules, website
+controls and block page. Prepare the promo tile and host a public privacy policy. The listing can describe
+local credential and personal-data inspection on supported AI websites, centrally managed rules and website
+blocking. See [browser coverage](./README.md#credential-protection-and-channel-coverage) for the supported paths.
+
+Provide a temporary reviewer account with an active plan through the store's private test instructions.
+Ask the reviewer to generate a browser activation code, connect the extension and open a supported AI site.
+In **Protection rules**, enable **Block passwords and secrets** and try a synthetic assignment such as
+`passcode: 7`. The paste and Send should be blocked. Switch the setting Off, wait for sync, and
+repeat the test. Remove the reviewer account after review and keep its credentials out of the repository.
+
+### Permission and privacy disclosures
+
+| Permission | Purpose |
+| --- | --- |
+| `storage` | Saves policy, browser activation metadata and unsent decision events. Holds the short-lived session in session storage. |
+| `alarms` | Checks for policy revisions and session renewals. |
+| `tabs` | Updates existing tabs and redirects blocked navigation. |
+| `declarativeNetRequest` | Enforces website restrictions and Safe Search. |
+| `<all_urls>` | Applies website policies across domains, enables local inspection on supported sites and lets the extension reach the organization's server. |
+
+AgentShield reports account email, browser/version information and security decision metadata to the
+organization's AgentShield server. It reports domains for organization-blocked websites and category
+labels for category blocking. Supported prompts, clipboard text and text attachments are checked locally.
+Current builds omit message text, file contents, filenames and free-text justifications from browser
+events. AgentShield uses no advertising or third-party analytics. The extension keeps a non-extractable
+device key and a queue of unsent decisions. Removing the extension stops checks and reporting. Adapt the
+privacy policy to the operator and support contact. [Data handling](./DATA_HANDLING.md)
+
+Before uploading, verify both packages with the reviewer steps and review the attribution and redistribution
+terms for the bundled website lists. [Website list licenses](./extension/rulesets/LICENSE-DATA.md)
+
+After approval, set `CHROME_STORE_EXTENSION_ID` and `EDGE_STORE_EXTENSION_ID` so the portal links to
+the listings and shows the correct force-install values. Store IDs differ from the self-hosted ID, so people
+switching to a store build need to connect the browser again.
+
+## Deploying the Cursor desktop hook
+
+Deploy the AgentShield Python modules and a policy snapshot to an administrator-managed endpoint directory.
+Use Cursor's [managed hook configuration](https://cursor.com/docs/hooks) to register `beforeSubmitPrompt`,
+`beforeReadFile` and `beforeTabFileRead`. Each entry invokes the same command with its own `--event` value.
+Set `failClosed` for each entry and have Cursor wait until managed hooks are loaded. Example Windows command
+with an administrator-installed Python executable and AgentShield's `backend/app` package under
+`C:\ProgramData\AgentShield\backend`.
+
+```powershell
+& 'C:\Program Files\Python313\python.exe' -I -c "import sys; sys.path.insert(0,'C:/ProgramData/AgentShield/backend'); from app.detection.cursor_hook import main; main()" --event beforeSubmitPrompt --policy-file 'C:\ProgramData\AgentShield\cursor-policy.json'
+```
+
+The UTF-8 policy JSON uses `block_passwords_and_secrets` and `credential_prefixes` from the organization
+policy, plus the optional endpoint setting `block_uninspectable_files`. Keep the snapshot current through
+your managed endpoint distribution and use an explicit true or false setting. The hook denies when its
+policy cannot be read. With inspection enabled it checks prompt text, supported context and UTF-8 attachments
+up to 2 MB. Images, archives and unreadable files follow `block_uninspectable_files`.
+
+The hook itself has no server credentials, sends no content or audit events and does not enroll the IDE in
+Protected Browsers. Browser policy changes reach connected browsers automatically. Cursor needs a refreshed
+managed policy file. Validate hook behavior with synthetic inputs in your deployed Cursor version before
+counting the IDE as protected. Other IDE extensions, terminal/MCP output and context outside the registered
+hooks need separate enforcement.
 
 ## Activating browsers
 

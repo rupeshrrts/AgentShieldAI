@@ -5,7 +5,7 @@
  *   - Most restrictive action wins: BLOCK > REDACT > WARN > MONITOR > ALLOW
  *   - Severity breaks ties: CRITICAL > HIGH > MEDIUM > LOW
  *   - A rule is enforced only by an ENABLED policy that applies to the site. A disabled rule, and a
- *     rule with no policy, is not enforced. Nothing falls back to a built-in default action.
+ *     rule with no policy, is not enforced by its rule row. The synced credential switch can override it.
  *   - Employee governance status can only make the result stricter.
  */
 import type { Finding, PolicyAction, PolicyEvaluationResult, PolicyRule, SeverityLevel } from './types';
@@ -24,6 +24,8 @@ export const SEVERITY_WEIGHT: Record<SeverityLevel, number> = {
   MEDIUM: 2,
   LOW: 1,
 };
+
+export const SECRET_BLOCK_MESSAGE = 'This message may contain a password or secret. Remove it before sending.';
 
 /**
  * Every rule the detectors can produce, in the same order as RULE_CATALOG in
@@ -89,8 +91,10 @@ export function evaluateFindings(
   findings: Finding[],
   policies: PolicyRule[],
   host: string,
-  userStatus: string = 'ACTIVE'
+  userStatus: string = 'ACTIVE',
+  secretBlocking?: boolean | null
 ): PolicyEvaluationResult {
+  if (secretBlocking === false) findings = findings.filter((finding) => finding.category !== 'SECRET');
   if (userStatus === 'SUSPENDED') {
     return {
       action: 'BLOCK',
@@ -106,7 +110,9 @@ export function evaluateFindings(
   // Pick the most restrictive action; ties go to higher severity, then the earliest finding
   let best: { action: PolicyAction; severity: SeverityLevel; rule: string } | null = null;
   for (const f of findings) {
-    const decision = actionForRule(f.rule_id, policies, host);
+    const decision = secretBlocking === true && f.category === 'SECRET' && f.severity === 'HIGH'
+      ? { action: 'BLOCK' as const, severity: f.severity }
+      : actionForRule(f.rule_id, policies, host);
     if (!decision) continue;
     const { action, severity } = decision;
     if (
@@ -131,7 +137,7 @@ export function evaluateFindings(
   const label = primaryRule ? RULE_LABELS[primaryRule] || primaryRule : '';
   let reason = 'No sensitive data detected.';
   if (winning === 'BLOCK') {
-    reason = escalated
+    reason = primaryRule?.startsWith('secret.') ? SECRET_BLOCK_MESSAGE : escalated
       ? `${label} detected. Your account is restricted, so warnings are treated as blocks.`
       : `${label} detected. Sending this to an AI tool is not allowed by your organization.`;
   } else if (winning === 'REDACT') {

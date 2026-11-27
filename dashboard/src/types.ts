@@ -248,6 +248,9 @@ export interface OrgSettings {
   organization_id: string;
   organization_name: string;
   retention_days: number;
+  block_passwords_and_secrets: boolean | null;
+  credential_prefixes: string[];
+  secret_protected_hosts: string[];
   store_clean_prompt_text: boolean;
   store_violation_prompt_text: boolean;
   block_unapproved_ai: boolean;
@@ -323,6 +326,7 @@ export interface AuditLogEntry {
 }
 
 export interface EndpointInfo {
+  secret_policy_active?: boolean | null;
   id: string;
   device_id: string;
   user_id?: string;

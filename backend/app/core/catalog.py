@@ -209,6 +209,7 @@ KNOWN_AI_DOMAINS: List[str] = [
     "jasper.ai",
     "writesonic.com",
     "quillbot.com",
+    "cursor.com",
 ]
 
 # Website categories the extension can block (lists ship inside the extension as DNR static

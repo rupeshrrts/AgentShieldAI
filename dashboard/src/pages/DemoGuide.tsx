@@ -46,23 +46,23 @@ const STEPS: Step[] = [
     id: 'masking',
     title: '3. The secret is not exposed in the logs',
     instructions: 'Nothing to do: this checks the stored event from step 2.',
-    expected: 'The stored text shows the key masked, never in full.',
+    expected: 'The stored event contains the decision without any prompt text.',
     check: (events) => {
       const e = latest(events, (x) => x.rule_id === 'secret.api_key_like');
       if (!e) return { pass: false, detail: 'Run step 2 first' };
-      const leaked = (e.prompt_preview || '').includes('ABCDEF1234567890') || (e.prompt || '').includes('ABCDEF1234567890');
-      return { pass: !leaked, detail: leaked ? 'Key found in stored text!' : `Stored as: ${e.prompt_preview || '(text not stored)'}` };
+      const hasText = Boolean(e.prompt_preview || e.prompt);
+      return { pass: !hasText, detail: hasText ? 'The event includes prompt text' : 'Only decision metadata recorded' };
     },
   },
   {
     id: 'warn-email',
     title: '4. Personal data triggers a warning',
-    instructions: 'Send this prompt, type a reason in the dialog, and click "Send anyway":',
+    instructions: 'Send this prompt and click "Send anyway" in the dialog:',
     testData: 'Draft a reply to priya.sharma@example.com about her refund',
-    expected: 'An amber warning asks for confirmation; the reason is recorded.',
+    expected: 'An amber warning asks for confirmation and records your decision.',
     check: (events) => {
       const e = latest(events, (x) => x.rule_id === 'pii.email' && x.action === 'WARN');
-      return { pass: Boolean(e), detail: e ? `${e.outcome.replace(/_/g, ' ')}${e.justification ? `, reason: "${e.justification}"` : ''}` : 'No email warning yet' };
+      return { pass: Boolean(e), detail: e ? e.outcome.replace(/_/g, ' ') : 'No email warning yet' };
     },
   },
   {
@@ -73,7 +73,7 @@ const STEPS: Step[] = [
     expected: 'A preview shows the keyword replaced with [REDACTED:RESTRICTED]; "Mask and send" sends the masked text.',
     check: (events) => {
       const e = latest(events, (x) => x.rule_id === 'restricted.keyword' && x.action === 'REDACT');
-      return { pass: Boolean(e), detail: e ? `Sent as: ${e.prompt_preview || '(text not stored)'}` : 'No redaction yet' };
+      return { pass: Boolean(e), detail: e ? 'Redaction recorded' : 'No redaction yet' };
     },
   },
   {

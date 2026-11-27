@@ -150,13 +150,19 @@ Each rule has an **action**, a **severity** (for sorting and risk scores) and an
 | :--- | :--- | :--- |
 | Block | Red dialog; nothing sent | Yes |
 | Redact | Preview with `[REDACTED:...]`; masked text sent (files with a match are blocked) | Yes |
-| Warn | Must confirm, may give a reason | Yes, with outcome and reason |
+| Warn | Must confirm | Yes, with the outcome |
 | Monitor | Nothing visible | Yes |
 | Allow | Nothing visible | No violation (prompt counted only) |
 
 The strictest action of all matching rules wins. A rule that is **Off** is not enforced at all. Built-in rules cannot be deleted (turn them Off instead). Changes reach connected browsers within about a minute, or immediately when the employee clicks **Sync Policies**. Every kind of restriction on one page: [README.md → What is blocked and allowed](./README.md#what-is-blocked-and-allowed). The **Protected Browsers** page shows which browsers have the latest policy version.
 
 Rules: credentials & keys, emails, phone numbers, payment cards, PAN, Aadhaar, confidential keywords, file uploads; since 2.6 also crypto wallet keys, connection strings with passwords, IBAN, Indian bank accounts (IFSC), UPI IDs, passport, voter ID, GSTIN and internal IP addresses (details and defaults: [README.md → What is blocked and allowed](./README.md#what-is-blocked-and-allowed)).
+
+**Block passwords and secrets** overrides the action for high-confidence credential matches on supported
+integrations. Off disables credential rules. Saved credential rules still apply until the switch is first set.
+Set public credential prefixes and managed native-form or Gmail destinations on the same page. The
+Protected Browsers page shows each browser's last acknowledged switch state.
+[Coverage and limits](./README.md#credential-protection-and-channel-coverage)
 
 ## Confidential keywords
 
@@ -182,7 +188,7 @@ Deployment & Settings → Privacy & retention.
 
 **Prompts & Risk Events** (**Security alerts** for individuals)
 * Filter by decision, application, time and employee; search text.
-* Click a prompt to see stored text, rule, outcome and the employee's reason.
+* Click an event to see the rule and outcome. Historical or legacy events can include stored text.
 * **Export CSV** downloads the filtered list (logged in the audit log).
 * **Employee Risk Profiles** tab: per-employee counts and risk level. Open an employee to **Warn**, **Restrict** (warnings become blocks) or **Suspend** (all prompts blocked). Takes effect in the browser within about 30 seconds.
 

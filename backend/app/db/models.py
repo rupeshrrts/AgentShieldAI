@@ -644,6 +644,8 @@ class Endpoint(Base):
     extension_version = Column(String(30), nullable=True)
     browser = Column(String(120), nullable=True)
     platform = Column(String(60), nullable=True)
+    secret_policy_active = Column(Boolean, nullable=True)
+    applied_policy_revision = Column(Integer, nullable=True)
     policy_version = Column(Integer, nullable=True)
     enrollment_source = Column(String(30), nullable=True)  # managed_policy, installer, enrollment_code
     first_seen_at = Column(DateTime(timezone=True), default=utc_now)
@@ -659,6 +661,9 @@ class OrganizationSettings(Base):
     store_clean_prompt_text = Column(Boolean, default=False)
     # Store the (secret-masked) text of prompts that triggered a rule, for investigations.
     store_violation_prompt_text = Column(Boolean, default=True)
+    block_passwords_and_secrets = Column(Boolean, nullable=True)
+    credential_prefixes = Column(Text, nullable=True)
+    secret_protected_hosts = Column(Text, nullable=True)
     # Block every known AI website that is not on the organization's ALLOW list ("shadow AI").
     block_unapproved_ai = Column(Boolean, default=False)
     # New browsers stay PENDING until an admin approves them.

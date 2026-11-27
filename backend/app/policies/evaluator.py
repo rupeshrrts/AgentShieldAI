@@ -10,13 +10,15 @@ This guarantees that high-risk violations (e.g. leaking an API key) are never
 bypassed just because a lower-risk policy (e.g. email warning) was also matched.
 
 IMPORTANT: extension/src/shared/policy.ts mirrors this logic (checked by backend/tests/test_policy_twins.py).
-A rule is enforced only by an enabled policy row; a rule without one is not enforced.
+A rule decision comes from an enabled policy row or the explicit credential setting.
 """
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 from app.core.catalog import ACTION_PRIORITY
 from app.detection.detector import Finding
+
+SECRET_BLOCK_MESSAGE = "This message may contain a password or secret. Remove it before sending."
 
 
 @dataclass
@@ -63,8 +65,12 @@ class PolicyEvaluator:
         policies: List[PolicyRule],
         site: Optional[str] = None,
         original_text: Optional[str] = None,
+        secret_blocking: Optional[bool] = None,
     ) -> PolicyEvaluationResult:
         """Determines the single governing action for a set of findings."""
+
+        if secret_blocking is False:
+            findings = [finding for finding in findings if finding.category != "SECRET"]
 
         # 1. If nothing was detected, allow immediately
         if not findings:
@@ -92,15 +98,16 @@ class PolicyEvaluator:
 
             active_policies.setdefault(policy.rule_id, policy)
 
-        # 3. Map each finding to the action of its enabled policy. A rule with no enabled policy is not
-        # enforced: the extension enforces exactly what the dashboard shows as On.
+        # 3. Apply the explicit credential setting, then look up the enabled policy for other matches.
         matched_evaluations: List[dict] = []
         for finding in findings:
             policy = active_policies.get(finding.rule_id)
-            if policy is None:
+            if secret_blocking is True and finding.category == "SECRET" and finding.severity == "HIGH":
+                action, severity = "BLOCK", finding.severity
+            elif policy is not None:
+                action, severity = policy.action.upper(), policy.severity.upper()
+            else:
                 continue
-            action = policy.action.upper()
-            severity = policy.severity.upper()
 
             matched_evaluations.append({
                 "finding": finding,
@@ -134,7 +141,9 @@ class PolicyEvaluator:
         highest_sev = winning["severity"]
 
         # 5. Build user-friendly feedback text
-        if final_action == "BLOCK":
+        if final_action == "BLOCK" and primary_rule.startswith("secret."):
+            reason = SECRET_BLOCK_MESSAGE
+        elif final_action == "BLOCK":
             reason = f"Prompt submission blocked: triggered rule '{primary_rule}' ({highest_sev} severity)."
         elif final_action == "REDACT":
             reason = f"Sensitive content requires redaction under rule '{primary_rule}'."

@@ -65,6 +65,9 @@ class ExtensionSettings(BaseModel):
     """Settings the extension needs to enforce locally."""
     store_clean_prompt_text: bool = False
     store_violation_prompt_text: bool = True
+    block_passwords_and_secrets: Optional[bool] = None
+    credential_prefixes: List[str] = Field(default_factory=list)
+    secret_protected_hosts: List[str] = Field(default_factory=list)
     block_unapproved_ai: bool = False
     # Website categories to block ({"adult": true, ...}) and whether Safe Search is enforced
     web_categories: Dict[str, bool] = Field(default_factory=dict)
@@ -335,6 +338,9 @@ class OrgSettingsOut(BaseModel):
     retention_days: int
     store_clean_prompt_text: bool
     store_violation_prompt_text: bool
+    block_passwords_and_secrets: Optional[bool] = None
+    credential_prefixes: List[str] = Field(default_factory=list)
+    secret_protected_hosts: List[str] = Field(default_factory=list)
     block_unapproved_ai: bool = False
     require_device_approval: bool = False
     web_categories: Dict[str, bool] = Field(default_factory=dict)
@@ -353,6 +359,9 @@ class OrgSettingsUpdate(BaseModel):
     retention_days: Optional[int] = Field(None, ge=1, le=3650)
     store_clean_prompt_text: Optional[bool] = None
     store_violation_prompt_text: Optional[bool] = None
+    block_passwords_and_secrets: Optional[StrictBool] = None
+    credential_prefixes: Optional[List[str]] = Field(default=None, max_length=32)
+    secret_protected_hosts: Optional[List[str]] = Field(default=None, max_length=100)
     block_unapproved_ai: Optional[bool] = None
     require_device_approval: Optional[bool] = None
     # Only the categories sent are changed; unknown ids are rejected
@@ -400,6 +409,8 @@ class EndpointHeartbeat(BaseModel):
     extension_version: Optional[str] = Field(default=None, max_length=30)
     browser: Optional[str] = Field(default=None, max_length=120)
     platform: Optional[str] = Field(default=None, max_length=60)
+    secret_policy_active: Optional[StrictBool] = None
+    applied_policy_revision: Optional[int] = None
     policy_version: Optional[int] = None
     enrollment_source: Optional[str] = Field(default=None, max_length=30)
 
@@ -413,6 +424,8 @@ class EndpointOut(BaseModel):
     extension_version: Optional[str] = None
     browser: Optional[str] = None
     platform: Optional[str] = None
+    secret_policy_active: Optional[StrictBool] = None
+    applied_policy_revision: Optional[int] = None
     policy_version: Optional[int] = None
     enrollment_source: Optional[str] = None
     first_seen_at: Optional[datetime] = None

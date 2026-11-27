@@ -12,19 +12,19 @@ export interface ModalText {
 
 export interface WarnDecision {
   proceed: boolean;
-  justification: string;
 }
 
 type Kind = 'block' | 'warn' | 'redact';
 
 const PRIVACY_NOTE =
-  'Checked on this computer. This event is recorded for your security team; passwords, keys and card/Aadhaar numbers are always masked.';
+  'Checked on this computer. Your security team receives the policy decision without the message or file contents.';
 
 export class AgentShieldOverlay {
   private overlayRoot: HTMLElement | null = null;
   private badgeRoot: HTMLElement | null = null;
 
-  constructor() {
+  constructor(showBadge: boolean) {
+    if (!showBadge) return;
     // The content script starts at document_start, before <body> exists
     if (document.body) {
       this.createProtectionBadge();
@@ -154,23 +154,29 @@ export class AgentShieldOverlay {
     return modal;
   }
 
-  public showBlockModal(result: PolicyEvaluationResult, text: ModalText = {}): Promise<void> {
+  public showBlockModal(result: PolicyEvaluationResult, text?: ModalText): Promise<void>;
+  public showBlockModal(result: PolicyEvaluationResult, text: ModalText | undefined, preview: string | undefined): Promise<boolean>;
+  public showBlockModal(result: PolicyEvaluationResult, text: ModalText = {}, preview?: string): Promise<boolean | void> {
     return new Promise((resolve) => {
       const modal = this.mount(`
         <div class="agentshield-modal-box agentshield-modal-block">
           ${this.header('block', text.title || 'Prompt blocked by security policy', text.subtitle || 'Your message was not sent to this AI tool.')}
-          <div class="agentshield-modal-body">${this.details(result)}</div>
-          ${this.footer('<button id="agentshield-block-dismiss" class="agentshield-btn agentshield-btn-danger">Return and edit</button>')}
+          <div class="agentshield-modal-body">${this.details(result)}
+            ${preview ? `<div class="agentshield-preview-label">Redacted draft</div><div class="agentshield-code-preview">${escapeHtml(preview)}</div>` : ''}
+          </div>
+          ${this.footer('<button id="agentshield-block-dismiss" class="agentshield-btn agentshield-btn-danger">Return and edit</button>' +
+            (preview ? '<button id="agentshield-block-replace" class="agentshield-btn agentshield-btn-primary">Use redacted draft</button>' : ''))}
         </div>`);
-      const close = () => {
+      const close = (replace: boolean) => {
         this.removeExistingModal();
-        resolve();
+        resolve(replace);
       };
       const btn = modal.querySelector<HTMLButtonElement>('#agentshield-block-dismiss');
       btn?.focus();
-      btn?.addEventListener('click', close);
+      btn?.addEventListener('click', () => close(false));
+      modal.querySelector('#agentshield-block-replace')?.addEventListener('click', () => close(true));
       modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') close();
+        if (e.key === 'Escape') close(false);
       });
     });
   }
@@ -182,22 +188,15 @@ export class AgentShieldOverlay {
           ${this.header('warn', text.title || 'Sensitive information detected', text.subtitle || 'Review before sending. Your message has not been sent yet.')}
           <div class="agentshield-modal-body">
             ${this.details(result)}
-            <label class="agentshield-preview-label" for="agentshield-justification">Business justification <span>(optional, recorded for your security team)</span></label>
-            <textarea id="agentshield-justification" class="agentshield-justification" maxlength="500" rows="2"
-              placeholder="e.g. Customer asked us to draft a reply; details are anonymised"></textarea>
           </div>
           ${this.footer(`
             <button id="agentshield-warn-cancel" class="agentshield-btn agentshield-btn-secondary">Cancel and edit</button>
             <button id="agentshield-warn-proceed" class="agentshield-btn agentshield-btn-warning">Send anyway</button>`)}
         </div>`);
-      const reasonEl = modal.querySelector<HTMLTextAreaElement>('#agentshield-justification');
       const done = (proceed: boolean) => {
-        const justification = (reasonEl?.value || '').trim();
         this.removeExistingModal();
-        resolve({ proceed, justification });
+        resolve({ proceed });
       };
-      // Keep typing in the reason box from reaching the page's own keyboard handlers
-      reasonEl?.addEventListener('keydown', (e) => e.stopPropagation());
       const cancelBtn = modal.querySelector<HTMLButtonElement>('#agentshield-warn-cancel');
       cancelBtn?.focus();
       cancelBtn?.addEventListener('click', () => done(false));

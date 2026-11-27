@@ -80,7 +80,7 @@ async function startBackend(tmp) {
   proc.stderr.on('data', (d) => (log = (log + d).slice(-4000)));
   for (let i = 0; i < 120; i++) {
     await sleep(500);
-    const ok = await fetch(`${API}/health`).then((r) => r.ok).catch(() => false);
+    const ok = await fetch(`${API}/health`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok).catch(() => false);
     if (ok) return { proc, admin };
     if (proc.exitCode !== null) break;
   }
@@ -93,6 +93,7 @@ async function api(token, method, url, body) {
     method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`${method} ${url} -> HTTP ${res.status}: ${text}`);
@@ -110,7 +111,8 @@ class Cdp {
     this.ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.id && this.pending.has(msg.id)) {
-        const { resolve, reject } = this.pending.get(msg.id);
+        const { resolve, reject, timer } = this.pending.get(msg.id);
+        clearTimeout(timer);
         this.pending.delete(msg.id);
         if (msg.error) reject(new Error(msg.error.message));
         else resolve(msg.result);
@@ -121,14 +123,21 @@ class Cdp {
   }
   open() {
     return new Promise((resolve, reject) => {
-      this.ws.onopen = resolve;
-      this.ws.onerror = reject;
+      const timer = setTimeout(() => reject(new Error('Browser debugging WebSocket did not open')), 10000);
+      this.ws.onopen = () => { clearTimeout(timer); resolve(); };
+      this.ws.onerror = () => { clearTimeout(timer); reject(new Error('Browser debugging WebSocket failed')); };
     });
   }
   send(method, params = {}, sessionId) {
     const id = ++this.nextId;
     this.ws.send(JSON.stringify({ id, method, params, sessionId }));
-    return new Promise((resolve, reject) => this.pending.set(id, { resolve, reject }));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Browser did not answer ${method}`));
+      }, 10000);
+      this.pending.set(id, { resolve, reject, timer });
+    });
   }
   on(method, sessionId, fn) {
     this.listeners.push({ method, sessionId, fn });
@@ -145,6 +154,7 @@ async function startBrowser(binary, profile) {
       `--load-extension=${EXT_DIR}`,
       `--disable-extensions-except=${EXT_DIR}`,
       '--disable-features=DisableLoadExtensionCommandLineSwitch',
+      '--disable-background-networking',
       // No real traffic: every host except the local test backend fails DNS (network rules still apply before DNS)
       '--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1 , EXCLUDE localhost',
       '--no-first-run',
@@ -156,9 +166,13 @@ async function startBrowser(binary, profile) {
   let version = null;
   for (let i = 0; i < 60 && !version; i++) {
     await sleep(250);
-    version = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`).then((r) => r.json()).catch(() => null);
+    version = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).catch(() => null);
+    if (proc.exitCode !== null) break;
   }
-  if (!version) throw new Error('Browser did not start with remote debugging');
+  if (!version) {
+    proc.kill();
+    throw new Error('Browser did not start with remote debugging');
+  }
   const cdp = new Cdp(version.webSocketDebuggerUrl);
   await cdp.open();
   let sw = null;
@@ -171,12 +185,23 @@ async function startBrowser(binary, profile) {
   return { proc, cdp, extId: new URL(sw.url).host, browser: version.Browser };
 }
 
-async function openTab(cdp, url, { network = false } = {}) {
+async function openTab(cdp, url, { network = false, fixture } = {}) {
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
   await cdp.send('Page.enable', {}, sessionId);
   await cdp.send('Runtime.enable', {}, sessionId);
   const seen = [];
+  if (fixture) {
+    await cdp.send('Fetch.enable', {}, sessionId);
+    cdp.on('Fetch.requestPaused', sessionId, ({ requestId, request }) => {
+      const documentRequest = new URL(request.url).pathname === '/agentshield-fixture';
+      void cdp.send('Fetch.fulfillRequest', {
+        requestId, responseCode: 200,
+        responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
+        body: Buffer.from(documentRequest ? fixture : '').toString('base64'),
+      }, sessionId);
+    });
+  }
   if (network) {
     await cdp.send('Network.enable', {}, sessionId);
     cdp.on('Network.requestWillBeSent', sessionId, (p) => seen.push(p.request.url));
@@ -187,6 +212,12 @@ async function openTab(cdp, url, { network = false } = {}) {
   const tab = {
     targetId,
     seen,
+    async enter() {
+      for (const type of ['keyDown', 'keyUp']) {
+        await cdp.send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
+      }
+    },
+    type: (text) => cdp.send('Input.insertText', { text }, sessionId),
     async eval(expression) {
       const r = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId);
       if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
@@ -205,13 +236,123 @@ async function openTab(cdp, url, { network = false } = {}) {
 
 // ------------------------------------------------------------------ checks
 
+async function checkComposers({ cdp, settings, sync, tryPrompt, setRule, admin }) {
+  // Serve synthetic composer layouts at their real hostnames with all requests intercepted.
+  const layouts = {
+    'claude.ai': '<div class="ProseMirror" contenteditable="true">Unrelated editor</div><fieldset><div data-testid="chat-input" contenteditable="true"></div><button type="submit">Send</button></fieldset>',
+    'chatgpt.com': '<div id="prompt-textarea" class="ProseMirror" contenteditable="true"></div><button data-testid="send-button">Send</button>',
+    'gemini.google.com': '<rich-textarea><div class="ql-editor" contenteditable="true"></div></rich-textarea><button aria-label="Send message">Send</button>',
+    'perplexity.ai': '<div id="ask-input" role="textbox" contenteditable="true"></div><button data-testid="submit-button">Submit</button>',
+    'cursor.com': '<div role="textbox" contenteditable="true"></div><button title="Send">Send</button>',
+  };
+  const sampleSecret = 'passcode: 7';
+  await settings({
+    block_passwords_and_secrets: true,
+    credential_prefixes: ['fixture_key_'],
+    secret_protected_hosts: ['forms.example.test', 'mail.google.com'],
+  });
+  await sync();
+  for (const [host, markup] of Object.entries(layouts)) {
+    const fixture = `<!doctype html><meta charset="utf-8"><main></main><script>
+      function mount() {
+        document.querySelector('main').innerHTML = ${JSON.stringify(markup + '<input type="file">')};
+        const editor = [...document.querySelectorAll('[contenteditable]')].pop();
+        editor.id ||= 'fixture-editor';
+        window.editor = editor;
+        editor.style.minHeight = '20px';
+        const send = () => fetch('/fixture-send', { method: 'POST', body: editor.innerText });
+        document.querySelector('button').onclick = send;
+        editor.onkeydown = (e) => { if (e.key === 'Enter') send(); };
+        editor.onpaste = editor.ondrop = () => { window.insertions++; };
+        document.querySelector('input[type=file]').onchange = () => fetch('/fixture-upload', { method: 'POST' });
+      }
+      window.insertions = 0;
+      mount();
+    </script>`;
+    const tab = await openTab(cdp, `https://${host}/agentshield-fixture`, { network: true, fixture });
+    const didSend = () => tab.seen.filter((url) => url.endsWith('/fixture-send')).length;
+    const dismiss = () => tab.eval("document.querySelector('#agentshield-block-dismiss')?.click()");
+    for (const type of ['paste', 'drop']) {
+      await tab.eval(`(() => {
+        const data = new DataTransfer();
+        data.setData('text/html', '<b>' + ${JSON.stringify(sampleSecret)} + '</b>');
+        const opts = { bubbles: true, cancelable: true };
+        editor.dispatchEvent(${JSON.stringify(type)} === 'paste'
+          ? new ClipboardEvent('paste', { ...opts, clipboardData: data })
+          : new DragEvent('drop', { ...opts, dataTransfer: data }));
+      })()`);
+      check(`${host} rich-text ${type} stopped before page handler`, await tab.eval('insertions'), 0);
+      await dismiss();
+    }
+    await tab.eval(`editor.innerHTML = '<p>passcode: <strong>7</strong></p>'; document.querySelector('button').click()`);
+    check(`${host} click blocks a rich-text credential`, await tab.eval("!!document.querySelector('#agentshield-block-dismiss')"), true);
+    await dismiss();
+    await tab.eval(`history.pushState({}, '', '/new'); mount(); editor.focus()`);
+    await tab.type('fixture_key_synthetic12345');
+    await tab.enter();
+    check(`${host} replaced composer blocks typed credential on Enter`, await tab.eval("!!document.querySelector('#agentshield-block-dismiss')"), true);
+    await dismiss();
+    check(`${host} blocked attempts emit no destination requests`, didSend(), 0);
+    await tab.eval(`editor.innerText = 'Explain HTTP headers'; document.querySelector('button').click()`);
+    await sleep(300);
+    check(`${host} clean message reaches destination`, didSend(), 1);
+    await tab.eval(`(() => {
+      const files = new DataTransfer();
+      files.items.add(new File(['passcode: 7'], '.env.local', { type: 'application/octet-stream' }));
+      const input = document.querySelector('input[type=file]');
+      input.files = files.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await sleep(300);
+    check(`${host} config file upload blocked before page handler`, await tab.eval("!!document.querySelector('#agentshield-block-dismiss')"), true);
+    check(`${host} blocked file emits no upload request`, tab.seen.some((url) => url.endsWith('/fixture-upload')), false);
+    await tab.close();
+  }
+  const formTab = await openTab(cdp, 'https://forms.example.test/agentshield-fixture', {
+    network: true,
+    fixture: '<!doctype html><form method="post" action="/fixture-send"><textarea name="message"></textarea><button>Send</button></form>',
+  });
+  await formTab.eval("document.querySelector('textarea').value = 'passcode: 7'; document.querySelector('button').click()");
+  check('Managed native form blocks credential submission', await formTab.eval("!!document.querySelector('#agentshield-block-dismiss')"), true);
+  check('Blocked form emits no destination request', formTab.seen.some((url) => url.endsWith('/fixture-send')), false);
+  await formTab.close();
+  const mailTab = await openTab(cdp, 'https://mail.google.com/agentshield-fixture', {
+    network: true,
+    fixture: `<!doctype html><div role="dialog">
+      <div contenteditable="true" role="textbox" aria-label="Message Body">passcode: 7</div>
+      <div role="button" aria-label="Send (Ctrl-Enter)" onclick="fetch('/fixture-send', {method:'POST'})">Send</div>
+    </div>`,
+  });
+  await mailTab.eval("document.querySelector('[role=button]').click()");
+  check('Managed Gmail-style composer blocks credential submission', await mailTab.eval("!!document.querySelector('#agentshield-block-dismiss')"), true);
+  check('Blocked webmail fixture emits no destination request', mailTab.seen.some((url) => url.endsWith('/fixture-send')), false);
+  await mailTab.close();
+  await settings({ block_passwords_and_secrets: false });
+  await sync();
+  check('Master switch Off lets contextual credentials through', await tryPrompt(sampleSecret), 'SENT');
+  await setRule('pii.credit_card', true, 'BLOCK');
+  await sync();
+  check('Master switch Off preserves card blocking', await tryPrompt('card 4111 1111 1111 1111'), 'BLOCK');
+  const eventPage = await api(admin, 'GET', '/api/v1/events?page_size=100');
+  const browserBlocks = eventPage.items.filter((event) => Object.hasOwn(layouts, event.site) && event.action === 'BLOCK');
+  check('Composer blocks reach the audit API', browserBlocks.length >= 3, true);
+  check('Composer block audit events contain decision metadata only',
+    browserBlocks.every((event) => !event.prompt && !event.prompt_preview && !event.justification), true);
+}
+
+function reportResults() {
+  const failed = results.filter((r) => !r.ok);
+  console.log('\n' + (results.length - failed.length) + ' passed, ' + failed.length + ' failed');
+  process.exitCode = failed.length ? 1 : 0;
+}
+
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-e2e-'));
   let backend = null;
   let browser = null;
   try {
     console.log('Building the extension (test build)...');
-    execFileSync(process.execPath, [path.join(EXT_DIR, 'build.js'), '--e2e'], { cwd: EXT_DIR, stdio: 'ignore' });
+    execFileSync(process.execPath, [path.join(EXT_DIR, 'build.js'), '--e2e'], { cwd: EXT_DIR, stdio: 'ignore', timeout: 30000 });
 
     backend = await startBackend(tmp);
     const login = await api(null, 'POST', '/auth/login', { email: backend.admin.email, password: backend.admin.password });
@@ -328,6 +469,11 @@ async function main() {
       'pii.gstin': ['Our GSTIN is 27AAPFU0939F1ZV', 'SENT'],
       'restricted.internal_ip': ['Connect to 192.168.1.20 over SSH', 'SENT'],
     };
+    if (process.argv.includes('--composers-only')) {
+      await checkComposers({ cdp, settings, sync, tryPrompt, setRule, admin });
+      reportResults();
+      return;
+    }
     for (const p of policies) await setRule(p.rule_id, false);
     await sync();
     for (const [rule, [text]] of Object.entries(SAMPLES)) check(`${rule} Off: prompt is sent`, await tryPrompt(text), 'SENT');
@@ -373,8 +519,8 @@ async function main() {
     check('paste of an AQ. token is stopped at once', await tryPaste('AQ.Synthetic_fixture-only_0123456789abcdefghijklm'), 'Paste blocked');
     const bearerHeader = 'Authorization: Bearer sample.token~42';
     const credentialSamples = {
-      UUID: 'deadbeef-abcd-4abc-abcd-abcdefabcdef',
-      '32-character hex': 'abcdefabcdefabcdefabcdefabcdefab',
+      'labeled UUID': 'API key: deadbeef-abcd-4abc-abcd-abcdefabcdef',
+      'labeled 32-character hex': 'API key: abcdefabcdefabcdefabcdefabcdefab',
       'provider-prefixed secret': 'sample_live_sk_DEMO_only_abcdef_42',
       Gemini: 'AQ.Synthetic_fixture-only_0123456789abcdefghijklm',
       Claude: 'sk-ant-api03-Synthetic_fixture_0123456789-',
@@ -386,6 +532,8 @@ async function main() {
       check(`${name} credential paste is blocked`, await tryPaste(sample), 'Paste blocked');
     }
     check('paste of clean text is allowed', await tryPaste('explain TCP vs UDP'), '');
+    check('ordinary order UUID paste is allowed', await tryPaste('Order ID deadbeef-abcd-4abc-abcd-abcdefabcdef'), '');
+    check('ordinary checksum paste is allowed', await tryPaste('Checksum abcdefabcdefabcdefabcdefabcdefab'), '');
     await setRule('secret.api_key_like', false);
     await sync();
     check('paste with the rule Off is allowed', await tryPaste('key sk-demo-EXAMPLE123456789'), '');
@@ -514,14 +662,19 @@ async function main() {
       check(`change applied without a manual sync (took ${seconds} s)`, outcome, 'BLOCK');
     }
 
+    await checkComposers({ cdp, settings, sync, tryPrompt, setRule, admin });
+
     // Leave the default protection On
     for (const p of policies) await setRule(p.rule_id, true);
   } finally {
-    if (browser) browser.proc.kill();
+    if (browser) {
+      browser.cdp.ws.close();
+      browser.proc.kill();
+    }
     if (backend) backend.proc.kill();
     // Restore the development build
     try {
-      execFileSync(process.execPath, [path.join(EXT_DIR, 'build.js')], { cwd: EXT_DIR, stdio: 'ignore' });
+      execFileSync(process.execPath, [path.join(EXT_DIR, 'build.js')], { cwd: EXT_DIR, stdio: 'ignore', timeout: 30000 });
     } catch (e) {
       console.error('Could not restore the development build: run node build.js', e.message);
     }
@@ -529,9 +682,7 @@ async function main() {
     fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
   }
 
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length} passed, ${failed.length} failed`);
-  process.exit(failed.length ? 1 : 0);
+  reportResults();
 }
 
 main().catch((e) => {

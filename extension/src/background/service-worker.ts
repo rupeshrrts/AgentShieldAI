@@ -607,6 +607,9 @@ class BackgroundService {
           browser: browserLabel(uaData),
           platform: uaData?.platform || navigator.platform || '',
           policy_version: this.syncState.policy_version,
+          applied_policy_revision: this.syncState.policy_revision,
+          secret_policy_active: this.syncState.settings?.block_passwords_and_secrets == null
+            ? undefined : this.syncState.settings.block_passwords_and_secrets && !this.paused(),
           enrollment_source: 'activation',
         }),
       });
@@ -988,8 +991,6 @@ class BackgroundService {
       action: event.action,
       outcome: event.outcome,
       user_id: this.activation?.email,
-      prompt: event.prompt,
-      justification: event.justification ? String(event.justification).slice(0, 500) : undefined,
       extension_version: EXTENSION_VERSION,
       policy_version: this.syncState.policy_version,
       // Same id on every retry or offline replay, so the server stores and meters the event once
@@ -1029,7 +1030,7 @@ class BackgroundService {
     const queue: any[] = Array.isArray(stored.eventQueue) ? stored.eventQueue : [];
     if (!queue.length) return;
     const remaining: any[] = [];
-    for (const payload of queue) {
+    for (const { prompt, prompt_preview, justification, ...payload } of queue) {
       if (!(await this.postEvent(payload))) remaining.push(payload);
     }
     await chrome.storage.local.set({ eventQueue: remaining });

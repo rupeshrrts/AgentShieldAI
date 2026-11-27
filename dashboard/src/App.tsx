@@ -309,7 +309,7 @@ export const App: React.FC = () => {
             <Overview metrics={metrics} endpoints={endpoints} me={me} isAdmin={isAdmin} onNavigate={setActiveTab} />
           )}
           {activeTab === 'policies' && (
-            <PolicyEditor policies={policies} policyVersion={policyVersion} isAdmin={isAdmin} onRefresh={loadData} />
+            <PolicyEditor policies={policies} policyVersion={policyVersion} isAdmin={isAdmin} onRefresh={loadData} settings={orgSettings} />
           )}
           {activeTab === 'domains' && <DomainManager isAdmin={isAdmin} endpoints={endpoints} />}
           {activeTab === 'events' && <SecurityEvents onBackToOverview={() => setActiveTab('overview')} />}

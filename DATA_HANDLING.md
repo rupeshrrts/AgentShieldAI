@@ -7,7 +7,7 @@ Answers to the standard data-protection questions, verified against the code at 
 | Data | When | Leaves the browser? |
 | :--- | :--- | :--- |
 | Prompt text on supported AI sites | When the employee sends a prompt | Only as described in §5 |
-| Names and sizes of files attached on AI sites | On upload | Yes, in the event (if "store text of prompts that broke a rule" is on) |
+| Names and sizes of files attached on AI sites | On upload | No, current browser events omit them |
 | Content of text files (≤ 2 MB) attached on AI sites | On upload, read in memory | **Never** |
 | Hostname of each page opened | On navigation, compared with block lists | Only for sites blocked by the account's own BLOCK list or as an unapproved AI tool (as a `dlp.*` event) |
 | Website category of a blocked page | The browser compares every page with the category lists built into the extension (`rulesets/`, generated from the HaGeZi DNS blocklists plus AgentShield's own additions in `web-category-additions.json`); no lookup service is called | Only the category of a page blocked by category blocking (`dlp.category.<id>` event, e.g. "adult website"); **the hostname is not sent** |
@@ -19,13 +19,15 @@ Answers to the standard data-protection questions, verified against the code at 
 
 Every event an activated browser reports for an inspected prompt is also **counted** as one prompt check for usage and billing (2.1): the server keeps per-day counts per account and person (`usage_daily`), not extra content.
 
-Browsing history is **not** collected. Prompt checks run only on the supported AI sites (`extension/src/content/adapters/chatgpt.ts`).
+Browsing history is **not** collected. Draft checks run on supported AI sites and native forms on explicitly managed hostnames (`extension/src/content/adapters/chatgpt.ts`).
 
 ## 2. What is inspected locally?
 
+Current browser builds report rule, destination, decision and existing device and policy metadata. They omit message text, clipboard contents, filenames, file contents and free-text justifications, including when sending queued legacy events. Historical records and API clients using legacy format are subject to their existing server retention and masking rules. Heartbeats include the applied policy revision and the explicit credential switch's active state. Public configured prefixes and hostnames are policy settings and their changes appear in the admin audit log.
+
 All prompt text and text-file content is inspected inside the browser by `extension/src/content/detector.ts` and decided by `extension/src/shared/policy.ts`. No content is sent anywhere to make a decision.
 
-**Network Agent (removed):** the optional local proxy added in 2.5 was removed in 2.6.1 and is no longer offered; the browser extension is the only component that inspects prompts.
+**Cursor desktop hook:** when separately installed, the hook reads supported prompt and file data in memory and writes only its allow or deny response to Cursor. It makes no network requests and does not write an audit file. The retired Network Agent is not required.
 
 ## 3. What is stored, and where?
 
@@ -92,7 +94,7 @@ No plaintext invite token (customer or staff), confirmation-link token, password
 ## 5. Is sensitive content transmitted outside the browser?
 
 Detected `Api-…` and `AQ.…` tokens and standalone password-like values receive credential masking in audit text. This masking applies independently of the rule's enforcement action.
-The same masking applies to detected bearer tokens, labeled API credentials, UUID-shaped values and 32-character hexadecimal values. IDs with these shapes can be masked even when they are used as ordinary identifiers.
+The same masking applies to detected authorization headers and labeled API credentials. Generic UUIDs and hexadecimal checksums require credential context.
 
 | Event | Text sent | Default |
 | :--- | :--- | :--- |
@@ -102,7 +104,7 @@ The same masking applies to detected bearer tokens, labeled API credentials, UUI
 | Blocked website (own BLOCK list, unapproved AI tool) | Hostname | Always |
 | Website blocked by category | Category only (no hostname) | Always |
 
-When a setting is off, the extension omits the text and the server discards any text it receives anyway (`backend/app/core/privacy.py: prepare_prompt_for_storage`). The server re-masks the same items (credentials, connection strings, wallet keys, card, Aadhaar, IBAN, bank account, passport and voter ID numbers) before storing, whatever the client sends. Text pasted into an AI prompt box (2.6) is checked locally like a prompt; only a paste that a Block rule stops is reported, as a masked event like a blocked prompt.
+These text settings apply to legacy API clients. When a setting is off, the server discards any text it receives (`backend/app/core/privacy.py: prepare_prompt_for_storage`). The server re-masks the same items (credentials, connection strings, wallet keys, card, Aadhaar, IBAN, bank account, passport and voter ID numbers) before storing, whatever the client sends. Text pasted into an AI prompt box (2.6) is checked locally like a prompt; only a paste that a Block rule stops is reported, as decision metadata like a blocked prompt.
 
 ## 6. Where are logs and security events stored?
 
@@ -144,7 +146,7 @@ Queued events are counted as prompt checks when they arrive (once each, by their
 
 1. **Admin Audit Log** page: every configuration change with before/after values, sign-ins and exports.
 2. **Prompts & Risk Events** → open an event: shows exactly what text was stored.
-3. **Guided Demo** (with `DEMO_MODE=true`): step 3 automatically checks that a test key was stored masked.
+3. **Guided Demo** (with `DEMO_MODE=true`): step 3 automatically checks that the test event contains no prompt text.
 4. **Network view:** `chrome://extensions` → AgentShield → "service worker" → Network tab shows every request the extension makes (only to your server).
 5. **Automated tests:** `backend/tests/test_api.py` and `test_enterprise.py` assert masking, privacy settings, tenant isolation and CSV safety; `test_activation.py` asserts that the event user comes from the activated device, that codes and sessions cannot be reused or forged, and employee role isolation; `test_saas.py` asserts isolation between self-registered companies, trial-abuse controls, licence enforcement; `test_internal.py` asserts that no staff session exists before MFA, that codes and recovery codes work once, the staff permission matrix, that customer/device tokens are refused by `/internal/*` and staff tokens by customer APIs, that licence exceptions are owner-only and audited, and cross-company protection of customer APIs; `test_no_hardcoded_secrets.py` scans the shipped source for credentials and secret tokens; `test_individual.py` asserts that individual accounts cannot use company management, that each event is metered once and only from activated browsers, that credits cannot be spent twice or set by the client, that credit packs add credits only from verified payments, and that personal API tokens never return prompt text and work nowhere else; `test_billing.py` asserts (with a fake Razorpay) that only the public key reaches the browser, that only captured, correctly signed, correct-amount payments activate a plan, idempotency, refunds, disputes and that receipts are visible only to their company (see README.md, Testing).
 6. **Users & Devices** page: every account, pending invite and authorized browser of the organization.

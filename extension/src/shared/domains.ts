@@ -25,8 +25,18 @@ export const SUPPORTED_AI_HOSTS = [
   'deepseek.com',
   'chat.mistral.ai',
   'poe.com',
+  'character.ai',
+  'you.com',
+  'huggingface.co',
   'meta.ai',
   'grok.com',
+  'chat.qwen.ai',
+  'kimi.com',
+  'pi.ai',
+  'jasper.ai',
+  'writesonic.com',
+  'quillbot.com',
+  'cursor.com',
 ];
 
 export interface DomainLists {

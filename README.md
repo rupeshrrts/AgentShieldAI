@@ -1,20 +1,17 @@
 # AgentShield — AI Data Protection for the Browser
 
-AgentShield stops employees from accidentally leaking passwords, API keys, customer data and confidential company information into AI tools such as ChatGPT, Claude and Gemini. A Chrome/Edge extension checks prompts and file uploads **inside the browser, before anything is sent**, and allows, monitors, warns, redacts or blocks them according to rules IT manages centrally. It also blocks risky websites and unapproved AI tools, and keeps an audit trail.
+AgentShield checks drafts and supported attachments locally in Chrome and Edge. Administrators manage credential
+protection, other DLP rules and website restrictions from the portal. The extension reports policy decisions for
+review. [Credential protection and channel coverage](#credential-protection-and-channel-coverage)
 
-This README is the single entry point for people **and AI coding agents**. Read [For AI agents and contributors](#for-ai-agents-and-contributors) before changing code.
-
-| Document | For |
-| :--- | :--- |
-| **[DEPLOY_STEPS.md](./DEPLOY_STEPS.md)** | **IT, start here: put it online and run it (GitHub → Render backend with `render.yaml` → Vercel portal, website, console), configuration, extension distribution, operations** |
-| [User setup](#user-setup) (this page) | Individuals and employees: sign up, start a plan, install, connect, understand alerts |
-| [What is blocked and allowed](#what-is-blocked-and-allowed) (this page) | Administrators: every kind of restriction, what it blocks and allows, defaults, and which wins |
-| [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) | Administrators: rules, websites, keywords, investigations; AgentShieldAI staff: internal admin console |
-| [SECURITY_ARCHITECTURE.md](./SECURITY_ARCHITECTURE.md) | Reviewers: trust boundaries, enforcement, limitations |
-| [DATA_HANDLING.md](./DATA_HANDLING.md) | Privacy / DPDP: what is collected, stored, sent, retained |
-| [Testing](#testing) (this page) | Test commands, results, manual scenarios, demo script |
-| [STORE_SUBMISSION.md](./STORE_SUBMISSION.md) | Chrome Web Store / Edge Add-ons: build the packages, listing, permission justifications, privacy disclosures |
-| [AGENTS.md](./AGENTS.md) | Rules for AI coding agents |
+| Task | Guide |
+| --- | --- |
+| Install and connect a browser | [User setup](#user-setup) |
+| Configure rules and investigate events | [Administrator Guide](./ADMIN_GUIDE.md) |
+| Deploy services or distribute the extension | [Deployment Guide](./DEPLOY_STEPS.md) |
+| Review trust boundaries and enforcement | [Security Architecture](./SECURITY_ARCHITECTURE.md) |
+| Review collection, retention and access | [Data Handling](./DATA_HANDLING.md) |
+| Change or test the code | [For AI agents and contributors](#for-ai-agents-and-contributors) ? [Testing](#testing) |
 
 ---
 
@@ -37,7 +34,8 @@ This README is the single entry point for people **and AI coding agents**. Read 
 15. [For AI agents and contributors](#for-ai-agents-and-contributors)
 16. [Testing](#testing)
 17. [Known limitations](#known-limitations)
-18. [Change history](#change-history)
+18. [Credential protection and channel coverage](#credential-protection-and-channel-coverage)
+19. [Change history](#change-history)
 
 ---
 
@@ -46,7 +44,7 @@ This README is the single entry point for people **and AI coding agents**. Read 
 | Feature | Status |
 | :--- | :--- |
 | Prompt checks on ChatGPT, Claude, Gemini, Copilot, Perplexity, DeepSeek, Mistral, Poe, Meta AI, Grok (Enter, Ctrl/Cmd+Enter, send button, form submit) | Implemented, unit-tested |
-| Actions: Block, Redact, Warn (with employee justification), Monitor, Allow; strictest wins | Implemented, unit-tested |
+| Actions: Block, Redact, Warn (with confirmation), Monitor, Allow; strictest wins | Implemented, unit-tested |
 | Detectors: API keys/tokens/JWT/private keys/passwords, email, phone, payment cards (Luhn), Aadhaar (Verhoeff), PAN, custom keywords | Implemented, tested in both detectors |
 | File-upload control (picker, drag-and-drop, paste); text files ≤ 2 MB scanned | Implemented; PDF/Office/image content not inspected |
 | Website blocking at network level; optional "block unapproved AI tools" | Implemented, unit-tested |
@@ -66,7 +64,7 @@ This README is the single entry point for people **and AI coding agents**. Read 
 | Offline enforcement with event queue | Implemented |
 | Getting-started checklist, guided demo with real verification | Implemented |
 | Dashboard-controlled enforcement (2.6): each protection rule, website category, Safe Search, "block unapproved AI tools" and website rule is enforced only while it is On; changes reach connected browsers within about a minute (1-minute revision check) | Implemented; unit-, API- and real-browser-tested (headless Edge 156, `extension/tests/e2e/rules-e2e.js`, 39 checks) |
-| Chrome Web Store / Edge Add-ons packages (2.6): no `.exe` or native-messaging dependency, packager + validator (`scripts/packaging/store-packages.js`), listing and privacy texts ([STORE_SUBMISSION.md](./STORE_SUBMISSION.md)) | Packages build and pass the checks; **not yet uploaded or reviewed by the stores**; Google Chrome itself not run (branded Chrome no longer loads unpacked test builds) |
+| Chrome Web Store / Edge Add-ons packages (2.6): no `.exe` or native-messaging dependency, packager + validator (`scripts/packaging/store-packages.js`), listing and privacy texts ([Publishing to browser stores](./DEPLOY_STEPS.md#publishing-to-browser-stores)) | Packages build and pass the checks; **not yet uploaded or reviewed by the stores**; Google Chrome itself not run (branded Chrome no longer loads unpacked test builds) |
 | Paste and drop check on AI sites (2.6): text pasted or dropped into the prompt box is checked at once; data an enabled Block rule covers never reaches the box | Implemented, real-browser-tested. Copying itself and pasting outside AI sites are not monitored |
 | Page-level website blocking (2.6): open tabs are re-checked when a rule or category is switched On; back/forward-cache pages are re-checked | Implemented; the open-tab case is real-browser-tested, the back/forward case is not automated |
 | 9 more data-protection rules (2.6): crypto wallet keys, connection strings, IBAN, Indian bank account/IFSC, UPI, passport, voter ID, GSTIN, internal IPs | Implemented in both detectors, shared cases, real-browser-tested On/Off |
@@ -75,18 +73,9 @@ This README is the single entry point for people **and AI coding agents**. Read 
 
 ## Customer journey (individual accounts)
 
-Since 2.1.0 the public product is the **Individual** account; **Company** workspaces are shown as "Coming soon" (existing company tenants keep their company features). Everything happens in one portal with one sign-in (details for the person: [User setup](#user-setup)):
-
-1. **Sign up** on the portal's sign-in page → **Create an account** → **Individual** (name optional, email, password). You are signed in at once.
-2. **Confirm your email** only when the server sets `EMAIL_VERIFICATION_REQUIRED=true` (off by default since 2.4.1): the emailed link (`#verify=…`) is then needed before the Free plan and the trial, and a banner offers **Send a new link**. The invite-a-friend bonus always needs a confirmed email.
-3. **Start a plan** on **Account & plan** (until then every other portal page is locked): **Start free** (the 30-day trial while it can still be claimed, then the Free plan; otherwise the Free plan straight away), a monthly / 6-month / annual plan, or prepaid **credits** (pay as you go), paid in Razorpay's hosted Checkout.
-4. **Download.** Add the AgentShield extension to Chrome or Edge (store link, or the zip with Load unpacked until it is published). No Windows program is needed or offered (the setup `.exe` was removed in 2.6, the Network Agent in 2.6.1).
-5. **Connect.** **Connect browser → Generate activation code** (single-use, 30 minutes) → paste it into the extension → **Connect and verify**. AI sites are now protected. Each browser connects with its own code.
-6. **Manage everything in the same portal:** usage and credits, security alerts, protection rules and website controls, connected browsers, personal API tokens, profile and password.
-
-**Free forever (2.3):** an individual account that chose the Free plan, or whose trial or paid plan ended, is on the **Free plan** (with `EMAIL_VERIFICATION_REQUIRED=true` only after the email is confirmed): 300 prompt checks per UTC month on 1 browser (staff can change both). When they are used up, AI sites stay usable and website controls keep working, but prompt checks pause ("Protection paused") until the 1st, an upgrade or credits. When a trial or plan ends, individuals move to the Free plan instead of being locked. **Invite friends:** the Account page has an invite link (`/#ref=<code>`); when a friend signs up with it and confirms their email, both accounts get 100 bonus prompt checks (credits), for up to 10 friends.
-
-For company workspaces (and individuals without a confirmed email): when the trial or plan ends, the plan's included monthly prompt checks or the credits run out, or the person's own monthly limit is reached, every browser of the account **locks automatically at its next request** (AI sites blocked) and **unlocks by itself** after renewal, a top-up or a higher limit, without reinstalling or a new code.
+Create an account, choose a plan or credits, install the extension and connect the browser with a single-use
+activation code. Existing company workspaces use employee invitations and their company plan. For step-by-step
+instructions and what happens when checks or credits run out, see [User setup](#user-setup).
 
 ## User setup
 
@@ -483,7 +472,7 @@ Customer roles today are `ADMIN`, `VIEWER` and `EMPLOYEE` (Phase B will add Comp
 ## Browser extension
 
 * **Messages** (service worker, sender must be this extension): `GET_STATUS`, `GET_POLICIES` (includes `authorized`), `GET_DOMAIN_LISTS`, `GET_USER_STATUS`, `TRIGGER_SYNC`, `RETRY`, `RECORD_SECURITY_EVENT`, `DOMAIN_BLOCKED`, `CATEGORY_BLOCKED`; from extension pages only (the popup; not tabs): `ACTIVATE {code}`, `SIGN_OUT`; broadcast `POLICIES_UPDATED` (includes `authorized`). `CONNECT_VIA_PC` and the Windows app (`shared/pc-app.ts`, `nativeMessaging`) were removed in 1.9.0.
-* **Permissions (1.9.0):** `storage`, `alarms`, `tabs`, `declarativeNetRequest`, host access to all sites (website controls apply everywhere; prompt checks run only on AI sites). Justifications for the store review: [STORE_SUBMISSION.md](./STORE_SUBMISSION.md).
+* **Permissions (1.9.0):** `storage`, `alarms`, `tabs`, `declarativeNetRequest`, host access to all sites (website controls apply everywhere; text checks run on supported AI sites and managed destinations). Justifications for the store review: [Publishing to browser stores](./DEPLOY_STEPS.md#publishing-to-browser-stores).
 * **Rule sync (1.9.0):** alarm `policy-refresh` every minute → `GET /api/v1/policies/revision`; when it differs from the revision of the last full sync (or 5 minutes have passed) → full `syncPolicies()`, network rules, category rulesets and a `POLICIES_UPDATED` broadcast. `shared/policy.ts`: `actionForRule` enforces only enabled rows; `policiesComplete()` must be true (every `CATALOG_RULE_IDS` present) before `content.ts` sends anything.
 * **Builds:** `node build.js` (development, localhost defaults); `node ../scripts/packaging/store-packages.js --api-url … --dashboard-url …` (store packages, production addresses baked in, then checked); `node build.js --e2e` is only for `tests/e2e/rules-e2e.js` (lets the test drive the popup page from a tab) and is never packaged.
 * **Storage:** `chrome.storage.local`: `activation` (server, device ID, email; no secret), `installId`, `syncState`, `policies`, `keywords`, `settings`, `domain_rules`, `blocked_domains`, `allowed_domains`, `domain_lists`, `userStatus`, `eventQueue`. `chrome.storage.session`: `deviceSession` (cleared when the browser closes). IndexedDB `agentshield-identity`: the non-extractable device key pair. The authorized state is never read from storage.
@@ -695,7 +684,7 @@ Templates: `.env.example` (development) and `.env.production.example`; productio
 2. **Never commit or print secrets:** `.env`, activation codes (`ASA1.…`) and tokens (`asa_…`), invite and confirmation links/tokens (`asi_…`, `asv_…`), staff invite links/tokens (`ast_…`), personal API tokens (`aspt_…`), session tokens (customer, device and staff), staff temporary passwords, authenticator secrets and recovery codes, legacy device keys (`asd_…`) and enrollment codes (`ASE1.…`), passwords. Never add default credentials, default secrets or demo logins to shipped code (`test_no_hardcoded_secrets.py` fails the build).
 3. **Auth:** extension-facing endpoints use `get_principal`; organization data uses `get_current_user` (operators only); own-account endpoints use `get_signed_in_user`; admin changes use `get_current_admin` and call `record_admin_action`. Internal (`/internal/api/*`) routes use `require_staff("<permission>")` with a permission from `STAFF_PERMISSIONS` (never a role check) and audit with `actor_type="staff"`; never let a customer token reach them or a staff token reach customer APIs. Never put admin credentials or a shared key in the extension, and keep it fail closed: only a server-issued session may unlock it.
 4. **Tenant isolation:** take the organization from the credential and filter every query by it.
-5. **Privacy:** prompt text written to the DB goes through `prepare_prompt_for_storage()`; the extension sends only `maskSecretsForAudit()` output, and only when settings allow.
+5. **Privacy:** prompt text written to the DB goes through `prepare_prompt_for_storage()`; new browser builds send decision metadata only.
 6. **Keep the twins identical:** `detector.ts` ↔ `detector.py`, `shared/policy.ts` ↔ `policies/evaluator.py`. Add cases to `detection_cases.json`; both test suites must pass.
 7. **New rule IDs** must be added to `core/catalog.py` (otherwise the API rejects policies for them), both detectors, and `RULE_LABELS`/`RULE_ADVICE` in `shared/policy.ts`. (The extension has no built-in rules any more: it enforces only rules synced while authorized.)
 8. **No fake data or success messages** in the dashboard; every number must come from the API.
@@ -723,13 +712,17 @@ Templates: `.env.example` (development) and `.env.production.example`; productio
 | Block an extra site in a website category | `extension/src/shared/web-category-additions.json`, then `node extension/scripts/update-web-categories.js --additions-only`; `npm test` in `extension/` |
 | PCs connected earlier (Windows app retired in 2.6, Network Agent removed in 2.6.1) | `api/computers.py`, `api/device_auth.py: activate` (codes with `computer_id`), `core/entitlements.py: active_device_count`, `dashboard/src/pages/MyActivation.tsx` (list of old PCs, Remove PC), `backend/tests/test_computers.py` |
 | Rule sync, revision, On/Off enforcement | `core/policy_revision.py` (call `bump_policy_revision` in every endpoint that changes what browsers enforce), `api/policies.py` (`list_policies` ensures every catalog row, `/revision`), `service-worker.ts: periodicRefresh/revisionChanged/syncPolicies`, `shared/policy.ts: actionForRule/policiesComplete`, `content.ts`, `backend/tests/test_policy_revision.py`, `extension/tests/e2e/rules-e2e.js` |
-| Store packages | `scripts/packaging/store-packages.js` (allowed permissions, forbidden files, checks), `extension/build.js` (`AGENTSHIELD_API_URL`, `AGENTSHIELD_DASHBOARD_URL`), [STORE_SUBMISSION.md](./STORE_SUBMISSION.md) |
+| Store packages | `scripts/packaging/store-packages.js` (allowed permissions, forbidden files, checks), `extension/build.js` (`AGENTSHIELD_API_URL`, `AGENTSHIELD_DASHBOARD_URL`), [Publishing to browser stores](./DEPLOY_STEPS.md#publishing-to-browser-stores) |
 | Installer fields | `scripts/system-installer/Install-AgentShield.ps1`, `extension/managed_schema.json` (server address only; never a credential) |
 
 ### Definition of done
 Backend tests pass on a temporary DB; `npm test`, `npx tsc --noEmit` and `node build.js` pass in `extension/`; `npm run build` passes in `dashboard/` (and in `admin-console/` when it changed); docs (this file's change history, and DATA_HANDLING / SECURITY_ARCHITECTURE if behaviour changed) are updated.
 
 ## Testing
+
+Run `node tests/e2e/rules-e2e.js --composers-only` from `extension/` for the credential regression in Edge.
+It uses a temporary SQLite database, synthetic composers on the supported hostnames and intercepted
+destination requests. The suite checks browser event handling without sending data to live AI or mail services.
 
 ### Automated tests
 
@@ -803,7 +796,7 @@ Use synthetic data only. With `DEMO_MODE=true` the dashboard's **Guided Demo** p
 | 1 | Activation (before/after pasting a code) | First **Activation Required**; then popup Protected, signed in as the account; the browser is listed in Users & Devices and Protected Browsers within 1 minute |
 | 2 | Send `api_key = sk-demo-ABCDEF1234567890XYZ` on chatgpt.com | Red notice; not sent; event `secret.api_key_like` BLOCK |
 | 3 | Open that event | Stored text shows `api_****[MASKED]`, never the key |
-| 4 | Send `Draft a reply to priya.sharma@example.com`, give a reason, **Send anyway** | Amber notice; event WARN `warned_and_confirmed` with the reason |
+| 4 | Send `Draft a reply to priya.sharma@example.com`, choose **Send anyway** | Amber notice and a WARN `warned_and_confirmed` event |
 | 5 | In scenario 2 press Enter again or click Send | Blocked every time (dismissing is not a bypass) |
 | 6 | After confirming scenario 4, add a key to the text and press Enter | Blocked (an approval covers only the confirmed text) |
 | 7 | Send the scenario-2 text with Ctrl+Enter | Blocked |
@@ -845,7 +838,7 @@ For a security reviewer or buyer. Prepare: backend with `DEMO_MODE=true`, one ac
 1. **Problem (1 min).** "Employees paste customer data and keys into AI tools. We stop that in the browser, before it is sent."
 2. **Coverage & Limits page (1 min).** Show honestly what is and isn't enforced.
 3. **Credential block (2 min).** Scenario 2, then 5 (pressing Enter again doesn't bypass). Show the event and that the key is masked (scenario 3).
-4. **Warn with justification (2 min).** Scenario 4; show the reason in the event.
+4. **Warn with confirmation (2 min).** Scenario 4 shows the decision in the event.
 5. **Redaction and file upload (2 min).** Scenarios 8 and 9.
 6. **Websites (2 min).** Scenarios 11 and 12.
 7. **Central control (2 min).** Scenario 13, then the Admin Audit Log entry.
@@ -860,7 +853,35 @@ No automated Google Chrome run (only Edge); no manual run on a clean PC yet; pay
 
 Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limitations-not-enforced): Chromium browsers only; employees can remove an extension unless it is force-installed by policy; PDF/Office/image content is not inspected; pattern-based detection can miss rephrased data; site layout changes can disable prompt checks on that site; customer accounts use email + password (no SSO/MFA; staff have TOTP MFA but no hardware-key/WebAuthn option); the staff session token is in `sessionStorage`, so an XSS in the console would expose it (the console loads no third-party scripts, only Google Fonts); the internal console has no customer analytics, support or further operations pages yet (Phases B–D); INTERNAL licences still exist for the initial company created from `INITIAL_ADMIN_*`; sign-up signs in before the email is confirmed, so someone can register an address they do not own (the trial still needs the confirmation link) until the owner takes it over with Forgot password; usage metering counts only what activated extensions report (a modified extension could under-report, and the server cannot see prompts that are never reported, but protection stops server-side when access ends); the offline event queue is capped at 500 events; the usage month is the UTC calendar month; credits never expire and there are no invoices beyond payment receipts; Company features are hidden and refused for individual accounts (existing company tenants keep them); a user with developer mode can edit a self-installed extension to skip the activation screen (the server still refuses it); lockout/rate-limit counters (customer and staff) are per-process memory; no automatic deletion of the admin audit log; the dashboard loads Google Fonts; Vite 5 dev-server advisories (dev only); payment receipts are not GST tax invoices; no proration when switching plans; reconciliation covers one-time orders only (monthly charges rely on webhooks).
 
+## Credential protection and channel coverage
+
+In **Protection rules**, **Block passwords and secrets** blocks high-confidence credentials in supported AI composers and text attachments. The same switch enables checks on native text forms and supported Gmail compose dialogs for the hostnames listed under **Managed form destinations**. Off disables credential rules while website restrictions and other DLP rules continue. Existing organizations keep using their saved credential rules until an administrator sets the switch. Connected browsers report whether the explicit setting is active for the last acknowledged policy revision. Free-plan prompt-check pauses still apply.
+
+Use public credential prefixes such as an organization's documented token prefix. The extension matches the prefix followed by at least 12 token characters. Password assignments and provider-specific tokens are checked locally. Bare UUIDs and 32-character checksums require credential context. Arbitrary standalone passwords cannot be recognized reliably.
+
+| Channel | Coverage |
+| --- | --- |
+| Chrome and Edge AI composers | Supported DOM send paths for ChatGPT, Claude, Gemini and Perplexity. All known AI destinations are routed through the browser adapter, including Copilot, DeepSeek, Mistral, Poe, Meta AI, Grok, Qwen, Kimi and Cursor web. Generic layouts have partial coverage. |
+| AI attachments | The file upload rule covers picker, paste and drop. The extension also scans recognized text and configuration files up to 2 MB locally. Binary, unreadable and larger files follow the file upload rule. |
+| Other browser destinations | Partial. Explicitly managed hostnames cover standard text controls and native form submit events. Gmail compose dialogs can be opted in with mail.google.com. Login forms, other custom webmail composers, scripted submits, and non-AI attachments are outside this scope. |
+| Cursor desktop | Partial. A local hook handles supported Agent chat, attachments and file reads after separate managed deployment. [Cursor hook setup](./DEPLOY_STEPS.md#deploying-the-cursor-desktop-hook) |
+| VS Code AI | Unsupported. It needs a pre-send hook for the specific AI extension or a managed gateway that inspects the complete request and blocks direct provider access. |
+| Other browsers, desktop apps and direct API calls | Unsupported. Browser website blocks are limited to browser navigation. |
+
 ## Change history
+
+### Extension 1.10.3 — Credential protection and browser coverage (2026-11-27)
+
+* The portal ZIP is ready for manual Chrome and Edge installation. The signed managed update feed continues to serve 1.9.0 until a new CRX is signed with the existing extension key. Deploy the backend and dashboard before distributing the new browser build.
+
+* Credential blocking now checks explicit password arguments in shared command-line snippets, password values in XML, and common Spanish, French and Portuguese password labels. The same central switch and local scanning apply.
+
+### Credential protection and Claude composer support (2026-11-27)
+
+* Claude now resolves the active chat composer ahead of unrelated editors and recognizes composer Send controls. Perplexity has explicit composer and Submit selectors, and the generic browser adapter covers the known AI domain catalog. The extension checks inserted and submitted text locally, including after the composer is replaced.
+* Added an audited credential switch, organization credential prefixes, managed native web forms, Gmail compose dialogs and last-reported browser policy status.
+* Credential detection now covers short and Unicode password assignments, Basic and Bearer authorization headers, and private-key blocks. Browser security events carry decision metadata only. A supported redaction can replace the draft for review without sending it.
+
 
 ### Extension 1.10.2 — Standalone underscore-prefixed secret keys (2026-11-25)
 
@@ -903,7 +924,7 @@ Summarised from [SECURITY_ARCHITECTURE.md §5](./SECURITY_ARCHITECTURE.md#5-limi
   4. **Up to 5 minutes' delay** before a change reached the browser. Every enforced change (rule On/Off or action, presets, categories, Safe Search, unapproved-AI switch, website rules, keywords, settings) now increases `organizations.policy_revision`; the extension checks `GET /api/v1/policies/revision` **every minute** and downloads and applies the rules at once when it changed (measured in the real-browser test: 11 s).
 * **Every blocking feature, and its dashboard switch** (all wired to enforcement and tested On and Off in a real browser): Protection rules: API keys/tokens/passwords/private keys, email, phone, payment card, PAN, Aadhaar, confidential keywords, file uploads (each On/Off plus action, presets); Website controls: 7 categories (malware, adult, piracy, gambling, social, filter bypass, streaming), Safe Search, block unapproved AI tools, website BLOCK/ALLOW rules (each enabled/disabled). Not switchable by design: the activation lock (AI sites blocked until a browser is connected) and employee governance (Warn/Restrict/Suspend, per user). **Clipboard monitoring does not exist** (pasted text is checked when the prompt is sent; pasted files as uploads).
 * **No `.exe` dependency in the extension:** the `nativeMessaging` permission, `shared/pc-app.ts`, the popup's "Connect with the AgentShield app" card and `CONNECT_VIA_PC` were removed; each browser connects with its activation code. Portal: **Connect browser** no longer offers "Connect this PC" or the setup `.exe` (PCs connected earlier are listed so they can be removed); **Download** puts the extension first and labels the Network Agent optional; **Deployment** explains force-install by Chrome/Edge policy instead of the setup `.exe`. The backend's `/api/v1/computer/*` stays for the Network Agent.
-* **Store packages:** `node scripts/packaging/store-packages.js --api-url https://… --dashboard-url https://…` builds `dist-store/agentshield-chrome-1.9.0.zip` and `agentshield-edge-1.9.0.zip` (no manifest key, runtime files only) after checking them: Manifest V3, only `storage`/`alarms`/`tabs`/`declarativeNetRequest`, every referenced file present, no `.exe`/keys/source maps/sources, no remote or dynamic code, no native messaging, production server present. Listing text, permission justifications and privacy disclosures: [STORE_SUBMISSION.md](./STORE_SUBMISSION.md). `node build.js` reads `AGENTSHIELD_API_URL` / `AGENTSHIELD_DASHBOARD_URL` (https only).
+* **Store packages:** `node scripts/packaging/store-packages.js --api-url https://… --dashboard-url https://…` builds `dist-store/agentshield-chrome-1.9.0.zip` and `agentshield-edge-1.9.0.zip` (no manifest key, runtime files only) after checking them: Manifest V3, only `storage`/`alarms`/`tabs`/`declarativeNetRequest`, every referenced file present, no `.exe`/keys/source maps/sources, no remote or dynamic code, no native messaging, production server present. Listing text, permission justifications and privacy disclosures: [Publishing to browser stores](./DEPLOY_STEPS.md#publishing-to-browser-stores). `node build.js` reads `AGENTSHIELD_API_URL` / `AGENTSHIELD_DASHBOARD_URL` (https only).
 * **17 more switchable website categories, grouped like enterprise web filters and parental controls** (24 in total, all new ones Off by default, so nothing changes until switched on): *Security threats* (cryptomining, spyware & stalkerware, hacking, remote-access tools, dynamic DNS, URL shorteners), *Data leaks* (file sharing & online storage, personal webmail), *Adult content & kids safety* (mature & suggestive, dating, drugs, hate & violence, weapons, chat rooms), *Productivity* (online games, shopping, job search). Lists come from the UT1 blacklists of Université Toulouse Capitole (CC BY-SA 4.0, credited in `extension/rulesets/LICENSE-DATA.md`) plus AgentShield's own additions for Indian and major sites (Flipkart, Myntra, Naukri, MEGA, Proton…). `node scripts/update-web-categories.js --only <ids>` builds chosen categories without touching the others; the 7 existing lists are byte-for-byte unchanged. More never-block sites (LinkedIn, Gmail, Outlook, Zoom, Slack, Notion, Atlassian, Salesforce) apply to future list builds.
 * **Quick settings** in Category blocking: **Kids / family**, **Workplace**, **Security only**, **All off** (`WEB_CATEGORY_PRESETS` in `core/catalog.py`, sent with `GET /api/v1/org/settings` as `web_category_presets`, applied through the normal settings PATCH, so it is audited and bumps the revision). Categories are shown under headings (`web_category_groups`). Block page texts and "Can this be switched off?" cover every category. See RESTRICTIONS.md.
 * **9 more data-protection rules, modelled on enterprise DLP dictionaries** (each a switch with its own action in Protection rules; existing accounts get them, On with the recommended action, at their next sync): crypto wallet private keys (Block), connection strings with passwords (Block), IBAN (Block, mod-97), Indian passport (Block, needs "passport" nearby), Indian bank account / IFSC (Warn), UPI IDs (Warn, known handles only), voter ID / EPIC (Warn, needs "voter"/"EPIC"/"election" nearby), GSTIN (Monitor, check character), internal IP addresses (Monitor). In both twins (`detector.ts` ↔ `detector.py`), 23 new shared cases incl. look-alikes that must not trigger, masked before anything leaves the browser or is stored (`ALWAYS_MASKED_RULES`). **Deploy the backend before the new extension**: extension 1.9.0 waits ("Protection rules loading") until the server sends all 17 rules.

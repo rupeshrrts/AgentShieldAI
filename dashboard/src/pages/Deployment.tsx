@@ -299,8 +299,7 @@ export const Deployment: React.FC<DeploymentProps> = ({ isAdmin, onChanged, onNa
       {settingsDraft && (
         <section className="glass-panel" style={{ padding: '24px' }}>
           <SectionHeader icon={<Lock size={18} />} title="Privacy & retention">
-            API keys and passwords are always masked before storage, whatever you choose here. Check your local employee
-            monitoring rules (for example India's DPDP Act) and tell employees what is recorded.
+            Current browser builds report policy decisions without prompt text. The text settings below apply to legacy clients.
           </SectionHeader>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
@@ -315,7 +314,7 @@ export const Deployment: React.FC<DeploymentProps> = ({ isAdmin, onChanged, onNa
               <span>
                 <strong>Store text of prompts that broke a rule</strong>
                 <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Lets you see what was blocked, warned or redacted. Recommended for investigations.
+                  Applies to legacy clients that submit event text.
                 </div>
               </span>
             </label>
@@ -331,7 +330,7 @@ export const Deployment: React.FC<DeploymentProps> = ({ isAdmin, onChanged, onNa
               <span>
                 <strong>Store text of all other prompts</strong>
                 <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Off by default. When off, allowed prompts are counted but their text never leaves the employee's browser.
+                  Applies to legacy clients that submit event text. Off by default.
                 </div>
               </span>
             </label>

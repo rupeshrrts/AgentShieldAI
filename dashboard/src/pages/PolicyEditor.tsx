@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
-import { Policy, PolicyAction, RuleCatalogItem, SeverityLevel } from '../types';
+import { OrgSettings, Policy, PolicyAction, RuleCatalogItem, SeverityLevel } from '../types';
 import { api } from '../services/api';
 
 interface PolicyEditorProps {
@@ -8,6 +8,7 @@ interface PolicyEditorProps {
   policyVersion: number;
   isAdmin: boolean;
   onRefresh: () => void;
+  settings: OrgSettings | null;
 }
 
 const ACTIONS: Array<{ value: PolicyAction; label: string; help: string }> = [
@@ -33,13 +34,24 @@ const selectStyle: React.CSSProperties = {
   fontSize: '13px',
 };
 
-export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVersion, isAdmin, onRefresh }) => {
+export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVersion, isAdmin, onRefresh, settings }) => {
   const [catalog, setCatalog] = useState<RuleCatalogItem[]>([]);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   // Rules as the server saved them after a change, shown at once (the page's full refresh follows a moment later).
   // Without this a switch showed its old state until the refresh came back, so it looked as if the click had failed.
   const [saved, setSaved] = useState<Record<string, Policy>>({});
+  const [secretSettings, setSecretSettings] = useState<OrgSettings | null>(null);
+  const [prefixes, setPrefixes] = useState('');
+  const [hosts, setHosts] = useState('');
+
+  useEffect(() => {
+    if (settings) {
+      setSecretSettings(settings);
+      setPrefixes((settings.credential_prefixes ?? []).join(', '));
+      setHosts((settings.secret_protected_hosts ?? []).join(', '));
+    }
+  }, [settings]);
 
   useEffect(() => {
     api.getRuleCatalog().then(setCatalog).catch(() => setCatalog([]));
@@ -52,6 +64,19 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
   const flash = (tone: 'ok' | 'error', text: string) => {
     setMessage({ tone, text });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  const saveSecretSettings = async (changes: Partial<OrgSettings>) => {
+    setBusy('secrets');
+    try {
+      setSecretSettings(await api.updateOrgSettings(changes));
+      flash('ok', 'Credential protection settings saved. Connected browsers sync within about a minute.');
+      onRefresh();
+    } catch (e: any) {
+      flash('error', e.message || 'Could not save credential protection settings.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const update = async (p: Policy, changes: Partial<Policy>, label: string) => {
@@ -83,6 +108,8 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
   };
 
   const byRule = new Map(policies.map((p) => [p.rule_id, newest(p)]));
+  const legacySecretBlock = Array.from(byRule.values())
+    .some((rule) => rule.rule_id.startsWith('secret.') && rule.enabled && rule.action === 'BLOCK');
   const rows = catalog.length
     ? catalog.map((c) => ({ c, p: byRule.get(c.rule_id) })).filter((r) => r.p)
     : policies.map((p) => ({ c: undefined as RuleCatalogItem | undefined, p: newest(p) }));
@@ -118,6 +145,36 @@ export const PolicyEditor: React.FC<PolicyEditorProps> = ({ policies, policyVers
         </div>
       )}
 
+      {secretSettings && (
+        <section className="glass-panel" style={{ padding: '16px', display: 'grid', gap: '10px' }}>
+          <label>
+            <input type="checkbox" role="switch"
+              checked={secretSettings.block_passwords_and_secrets ?? legacySecretBlock}
+              disabled={!isAdmin || busy !== null}
+              onChange={(e) => void saveSecretSettings({ block_passwords_and_secrets: e.target.checked })} />
+            {' '}Block passwords and secrets
+          </label>
+          <p>Blocks high-confidence credentials on supported AI sites, managed native forms and recognized Gmail compose dialogs.</p>
+          {secretSettings.block_passwords_and_secrets == null && (
+            <p>Existing credential rules apply until you change this switch.</p>
+          )}
+          <label>
+            Public credential prefixes (comma-separated)
+            <input className="input-field" value={prefixes} disabled={!isAdmin || busy !== null}
+              onChange={(e) => setPrefixes(e.target.value)} placeholder="corp_key_" />
+          </label>
+          <label>
+            Managed form destinations (comma-separated hostnames)
+            <input className="input-field" value={hosts} disabled={!isAdmin || busy !== null}
+              onChange={(e) => setHosts(e.target.value)} placeholder="forms.example.com" />
+          </label>
+          {isAdmin && <button className="btn-secondary" style={{ justifySelf: 'start' }} disabled={busy !== null}
+            onClick={() => void saveSecretSettings({
+              credential_prefixes: prefixes.split(',').map((value) => value.trim()).filter(Boolean),
+              secret_protected_hosts: hosts.split(',').map((value) => value.trim()).filter(Boolean),
+            })}>Save prefixes and destinations</button>}
+        </section>
+      )}
       {isAdmin && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
           {PRESETS.map((preset) => (
